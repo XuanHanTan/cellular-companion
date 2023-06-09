@@ -1,46 +1,75 @@
 package com.xuanhan.cellularcompanion
 
+import android.annotation.SuppressLint
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
-import com.xuanhan.cellularcompanion.ui.theme.CellularCompanionTheme
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import com.xuanhan.cellularcompanion.ui.theme.AppTheme
+
+enum class Routes {
+    Start
+}
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            CellularCompanionTheme {
-                // A surface container using the 'background' color from the theme
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
-                ) {
-                    Greeting("Android")
-                }
+            AppTheme {
+                Main()
             }
         }
     }
 }
 
+@SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
+fun Main() {
+    val navController = rememberNavController()
+
+    Scaffold {
+        NavHost(navController = navController, startDestination = Routes.Start.name) {
+            composable(Routes.Start.name) {
+                StartScreen()
+            }
+        }
+    }
 }
 
 @Preview(showBackground = true)
 @Composable
-fun GreetingPreview() {
-    CellularCompanionTheme {
-        Greeting("Android")
+fun Preview() {
+    AppTheme {
+        Main()
     }
 }
+
+
+/*@Composable
+fun Greeting(name: String, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val requestDiscoverableIntent: ActivityResultLauncher<String> = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+        onResult = { result ->
+
+        }
+    )
+
+    Text(
+        text = "Hello $name!",
+        modifier = modifier
+    )
+    Button(onClick = {
+        val bluetoothController = BluetoothController(context)
+        bluetoothController.initialize()
+    }) {
+        Text("Test")
+    }
+}*/
