@@ -1,6 +1,7 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    id("com.google.devtools.ksp") version("1.8.10-1.0.9")
 }
 
 android {
@@ -30,11 +31,11 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions {
-        jvmTarget = "1.8"
+        jvmTarget = "17"
     }
     buildFeatures {
         compose = true
@@ -50,7 +51,9 @@ android {
 }
 
 dependencies {
-    implementation ("androidx.navigation:navigation-compose:2.6.0")
+    implementation("io.github.raamcosta.compose-destinations:animations-core:1.9.42-beta")
+    ksp("io.github.raamcosta.compose-destinations:ksp:1.9.42-beta")
+    implementation("androidx.navigation:navigation-compose:2.6.0")
     implementation("androidx.core:core-ktx:1.10.1")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.6.1")
     implementation("androidx.activity:activity-compose:1.7.2")
