@@ -51,6 +51,7 @@ android {
 }
 
 dependencies {
+    implementation("com.google.accompanist:accompanist-permissions:0.31.3-beta")
     implementation("io.github.raamcosta.compose-destinations:animations-core:1.9.42-beta")
     ksp("io.github.raamcosta.compose-destinations:ksp:1.9.42-beta")
     implementation("androidx.navigation:navigation-compose:2.6.0")

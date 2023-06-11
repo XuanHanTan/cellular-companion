@@ -1,21 +1,15 @@
-package com.xuanhan.cellularcompanion.control
+package com.xuanhan.cellularcompanion.models
 
-import android.Manifest
 import android.bluetooth.BluetoothManager
-import android.bluetooth.le.AdvertiseCallback
-import android.bluetooth.le.AdvertiseData
-import android.bluetooth.le.AdvertiseSettings
 import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanFilter
 import android.bluetooth.le.ScanResult
 import android.bluetooth.le.ScanSettings
 import android.content.Context
-import android.content.pm.PackageManager
 import android.os.ParcelUuid
-import androidx.core.app.ActivityCompat
 
 
-class BluetoothController(private val context: Context) {
+class BluetoothViewModel(private val context: Context) {
     private val bluetoothManager =
         context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
     private val bluetoothAdapter = bluetoothManager.adapter

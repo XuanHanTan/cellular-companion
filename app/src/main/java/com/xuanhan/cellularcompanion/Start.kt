@@ -25,7 +25,7 @@ import com.xuanhan.cellularcompanion.destinations.PermissionsDestination
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 @Destination(start = true)
-fun Start(destinationsNavigator: DestinationsNavigator) {
+fun Start(navigator: DestinationsNavigator) {
     Scaffold {
         Column(
             horizontalAlignment = CenterHorizontally,
@@ -42,7 +42,7 @@ fun Start(destinationsNavigator: DestinationsNavigator) {
             Text(text = "Ensure that you have purchased the Cellular app on the Mac App Store prior to setup.")
             Spacer(modifier = Modifier.height(48.dp))
             Button(onClick = {
-                destinationsNavigator.navigate(PermissionsDestination())
+                navigator.navigate(PermissionsDestination())
             }) {
                 Text("Get started")
             }
