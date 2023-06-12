@@ -31,8 +31,8 @@ import com.google.accompanist.permissions.rememberPermissionState
 import com.google.accompanist.permissions.shouldShowRationale
 import com.ramcosta.composedestinations.annotation.Destination
 import com.ramcosta.composedestinations.navigation.DestinationsNavigator
-import com.xuanhan.cellularcompanion.destinations.PermissionsDestination
-import com.xuanhan.cellularcompanion.models.PermissionViewModel
+import com.xuanhan.cellularcompanion.destinations.QRCodeDestination
+import com.xuanhan.cellularcompanion.viewmodels.PermissionViewModel
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
 @Composable
@@ -57,6 +57,13 @@ fun Permissions(navigator: DestinationsNavigator) {
                 )
             )
         }
+        add(
+            PermissionViewModel(
+                "Camera access",
+                "Required to scan the QR code shown on your Mac.",
+                rememberPermissionState(permission = Manifest.permission.CAMERA)
+            )
+        )
     }
     val scrollState = rememberScrollState()
 
@@ -135,7 +142,7 @@ fun Permissions(navigator: DestinationsNavigator) {
             Spacer(modifier = Modifier.weight(1f))
             if (permissions.all { permissionDescription -> permissionDescription.status.status == PermissionStatus.Granted }) {
                 Button(onClick = {
-                    navigator.navigate(PermissionsDestination())
+                    navigator.navigate(QRCodeDestination())
                 }) {
                     Text("Next")
                 }

@@ -1,4 +1,4 @@
-package com.xuanhan.cellularcompanion.models
+package com.xuanhan.cellularcompanion.viewmodels
 
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.PermissionState

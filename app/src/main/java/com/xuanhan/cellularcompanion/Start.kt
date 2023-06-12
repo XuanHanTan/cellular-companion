@@ -37,9 +37,15 @@ fun Start(navigator: DestinationsNavigator) {
                 contentDescription = "Graphic showing device connected to the Internet."
             )
             Spacer(modifier = Modifier.weight(1.0f))
-            Text(text = "Welcome to Cellular Companion", style = MaterialTheme.typography.displaySmall)
+            Text(
+                text = "Welcome to Cellular Companion",
+                style = MaterialTheme.typography.headlineLarge,
+            )
             Spacer(modifier = Modifier.height(8.dp))
-            Text(text = "Ensure that you have purchased the Cellular app on the Mac App Store prior to setup.")
+            Text(
+                text = "Ensure that you have purchased the Cellular app on the Mac App Store prior to setup.",
+                style = MaterialTheme.typography.bodyMedium,
+            )
             Spacer(modifier = Modifier.height(48.dp))
             Button(onClick = {
                 navigator.navigate(PermissionsDestination())
