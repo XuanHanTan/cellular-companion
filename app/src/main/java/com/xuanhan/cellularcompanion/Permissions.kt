@@ -38,6 +38,11 @@ import com.xuanhan.cellularcompanion.viewmodels.PermissionViewModel
 @Composable
 @Destination
 fun Permissions(navigator: DestinationsNavigator) {
+    val btConnectPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        rememberPermissionState(permission = Manifest.permission.BLUETOOTH_CONNECT)
+    } else {
+        null
+    }
     val permissions = ArrayList<PermissionViewModel>().apply {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             add(
@@ -45,7 +50,6 @@ fun Permissions(navigator: DestinationsNavigator) {
                     "Scanning for and connecting to nearby Bluetooth devices",
                     null,
                     status = rememberPermissionState(permission = Manifest.permission.BLUETOOTH_SCAN),
-                    altStatus = rememberPermissionState(permission = Manifest.permission.BLUETOOTH_CONNECT)
                 )
             )
         } else {
@@ -142,6 +146,9 @@ fun Permissions(navigator: DestinationsNavigator) {
             Spacer(modifier = Modifier.weight(1f))
             if (permissions.all { permissionDescription -> permissionDescription.status.status == PermissionStatus.Granted }) {
                 Button(onClick = {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        btConnectPermission!!.launchPermissionRequest()
+                    }
                     navigator.navigate(QRCodeDestination())
                 }) {
                     Text("Next")

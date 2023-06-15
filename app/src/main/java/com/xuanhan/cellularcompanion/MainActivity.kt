@@ -16,14 +16,15 @@ import com.ramcosta.composedestinations.DestinationsNavHost
 import com.ramcosta.composedestinations.animations.defaults.RootNavGraphDefaultAnimations
 import com.ramcosta.composedestinations.animations.rememberAnimatedNavHostEngine
 import com.xuanhan.cellularcompanion.destinations.StartDestination
+import com.xuanhan.cellularcompanion.models.BluetoothModel
 import com.xuanhan.cellularcompanion.ui.theme.AppTheme
 
-enum class Routes {
-    Start,
-    Permissions
-}
+@SuppressLint("StaticFieldLeak")
+// Note: Design flaw --> should have used state hoisting, but this isn't the biggest problem since there is only one activity.
+val bluetoothModel = BluetoothModel()
 
 class MainActivity : ComponentActivity() {
+    // TODO: ensure that Bluetooth is always on
     @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
     @OptIn(
         ExperimentalMaterialNavigationApi::class, ExperimentalAnimationApi::class,
@@ -60,26 +61,3 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
-
-
-/*@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    val context = LocalContext.current
-    val requestDiscoverableIntent: ActivityResultLauncher<String> = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission(),
-        onResult = { result ->
-
-        }
-    )
-
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-    Button(onClick = {
-        val bluetoothController = BluetoothController(context)
-        bluetoothController.initialize()
-    }) {
-        Text("Test")
-    }
-}*/

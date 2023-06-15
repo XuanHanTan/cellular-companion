@@ -27,7 +27,9 @@ import androidx.core.app.ComponentActivity
 import androidx.core.content.ContextCompat
 import com.ramcosta.composedestinations.annotation.Destination
 import com.ramcosta.composedestinations.navigation.DestinationsNavigator
+import com.xuanhan.cellularcompanion.destinations.SettingUpDestination
 import com.xuanhan.cellularcompanion.utilities.QRAnalyzer
+import org.json.JSONObject
 import java.util.concurrent.Executors
 
 @Composable
@@ -66,7 +68,7 @@ fun QRCode(navigator: DestinationsNavigator) {
                 modifier = Modifier.padding(horizontal = 16.dp)
             )
             Spacer(modifier = Modifier.weight(1f))
-            PreviewViewComposable()
+            PreviewViewComposable(navigator = navigator)
             Spacer(modifier = Modifier.weight(1f))
         }
     }
@@ -74,7 +76,7 @@ fun QRCode(navigator: DestinationsNavigator) {
 
 @androidx.camera.core.ExperimentalGetImage
 @Composable
-fun PreviewViewComposable() {
+fun PreviewViewComposable(navigator: DestinationsNavigator) {
     AndroidView(
         { context ->
             val cameraExecutor = Executors.newSingleThreadExecutor()
@@ -96,8 +98,17 @@ fun PreviewViewComposable() {
                     .build()
                     .also {
                         it.setAnalyzer(cameraExecutor, QRAnalyzer { text ->
-                            println(text)
-                            // TODO: do something with the QR code
+                            val data = JSONObject(text)
+                            if (!data.has("serviceUUID") || !data.has("sharedPIN")) {
+                                print("No usable data found in QR Code.")
+                                return@QRAnalyzer
+                            }
+
+                            val serviceUUID = data.get("serviceUUID").toString()
+                            val sharedPIN = data.get("sharedPIN").toString()
+
+                            navigator.navigate(SettingUpDestination(serviceUUID, sharedPIN))
+                            it.clearAnalyzer()
                         })
                     }
                 val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
@@ -122,6 +133,6 @@ fun PreviewViewComposable() {
             previewView
         },
         modifier = Modifier
-            .size(width = 256.dp, height = 256.dp)
+            .size(width = 256.dp, height = 455.dp)
     )
 }
