@@ -24,12 +24,12 @@ import com.xuanhan.cellularcompanion.viewmodels.SettingUpViewModel
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
 @Destination
-fun SettingUp(navigator: DestinationsNavigator, serviceUUID: String, sharedPIN: String) {
+fun SettingUp(navigator: DestinationsNavigator, serviceUUID: String, sharedKey: String) {
     val currentContext = LocalContext.current
     val viewModel = remember { SettingUpViewModel(currentContext.applicationContext) }
 
-    LaunchedEffect(keys = arrayOf(serviceUUID, sharedPIN)) {
-        viewModel.setupBluetooth(serviceUUID, sharedPIN)
+    LaunchedEffect(keys = arrayOf(serviceUUID, sharedKey)) {
+        viewModel.setupBluetooth(serviceUUID, sharedKey)
     }
 
     Scaffold(

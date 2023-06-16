@@ -7,12 +7,13 @@ import com.xuanhan.cellularcompanion.bluetoothModel
 class SettingUpViewModel(private val context: Context) {
     val loadingMessage = mutableStateOf("Establishing a secure connection...")
 
-    suspend fun setupBluetooth(serviceUUID: String, sharedPIN: String) {
+    suspend fun setupBluetooth(serviceUUID: String, sharedKey: String) {
         bluetoothModel.initializeFromQR(
             serviceUUID,
-            sharedPIN,
+            sharedKey,
             initOnConnectCallback = {
                 loadingMessage.value = "Sharing hotspot credentials..."
+                bluetoothModel.shareHotspotDetails("test", "test")
             },
             context = context.applicationContext
         )

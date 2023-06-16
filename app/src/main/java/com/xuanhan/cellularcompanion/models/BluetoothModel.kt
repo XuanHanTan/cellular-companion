@@ -5,6 +5,7 @@ import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothGatt
 import android.bluetooth.BluetoothGattCallback
+import android.bluetooth.BluetoothGattCharacteristic
 import android.bluetooth.BluetoothManager
 import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanFilter
@@ -27,16 +28,18 @@ val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "se
 
 class BluetoothModel {
     private val serviceUUIDKey = stringPreferencesKey("serviceUUID")
-    private val sharedPINKey = stringPreferencesKey("sharedPIN")
+    private val sharedKeyKey = stringPreferencesKey("sharedKey")
 
     private lateinit var bluetoothManager: BluetoothManager
     private lateinit var context: Context
     private lateinit var bluetoothAdapter: BluetoothAdapter
+    private val commandCharacteristicUUID = "00000001-0000-1000-8000-00805f9b34fb"
 
     private var serviceUUID: String? = null
-    private var sharedPIN: String? = null
+    private var sharedKey: String? = null
     private var connectDevice: BluetoothDevice? = null
     private var gatt: BluetoothGatt? = null
+    private var commandCharacteristic: BluetoothGattCharacteristic? = null
     private var isScanning = false
     private var isConnecting = false
     private var isDisconnecting = false
@@ -109,10 +112,7 @@ class BluetoothModel {
 
                     println("Connected to device ${gatt!!.device.address}")
 
-                    if (isFirstInitialising) {
-                        initOnConnectCallback?.invoke()
-                        // TODO: share hotspot info
-                    }
+                    gatt.discoverServices()
                 } else {
                     println("Disconnected from device advertising: ${gatt!!.device.address}")
                 }
@@ -130,46 +130,92 @@ class BluetoothModel {
                 }
             }
         }
+
+        override fun onServicesDiscovered(gatt: BluetoothGatt?, status: Int) {
+            super.onServicesDiscovered(gatt, status)
+            this@BluetoothModel.gatt = gatt
+
+            if (status == BluetoothGatt.GATT_SUCCESS) {
+                println("Discovered ${gatt!!.services.size} services for device ${gatt.device.address}")
+
+                if (gatt.services.find { it.uuid.toString() == serviceUUID } != null) {
+                    if (ActivityCompat.checkSelfPermission(
+                            context,
+                            Manifest.permission.BLUETOOTH_CONNECT
+                        ) != PackageManager.PERMISSION_GRANTED
+                    ) {
+                        return
+                    }
+
+                    println("Found Cellular service!")
+
+                    commandCharacteristic = getCharacteristicForDevice(commandCharacteristicUUID)
+
+                    gatt.requestMtu(517)
+                } else {
+                    // TODO: handle failed to find service
+                    println("Could not find service.")
+                }
+            } else {
+                // TODO: handle failed to connect to device
+                println("Service discovery failed due to internal error: $status")
+            }
+        }
+
+        override fun onMtuChanged(gatt: BluetoothGatt?, mtu: Int, status: Int) {
+            super.onMtuChanged(gatt, mtu, status)
+
+            if (status == BluetoothGatt.GATT_SUCCESS) {
+                if (isFirstInitialising) {
+                    initOnConnectCallback?.invoke()
+                }
+
+                println("MTU changed to $mtu")
+            } else {
+                // TODO: handle MTU change failed
+                println("Error: MTU change failed with status $status")
+            }
+        }
     }
 
     suspend fun initializeFromQR(
         serviceUUID: String,
-        sharedPIN: String,
+        sharedKey: String,
         initOnConnectCallback: () -> (Unit),
         context: Context
     ) {
-        // Validate and store service UUID and PIN in DataStore
+        // Validate and store service UUID and Key in DataStore
         val uuidRegex =
             Pattern.compile("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
         if (!uuidRegex.matcher(serviceUUID).matches()) {
             println("Invalid service UUID.")
             return
         }
-        if (!uuidRegex.matcher(sharedPIN).matches()) {
-            println("Invalid shared PIN.")
+        if (!uuidRegex.matcher(sharedKey).matches()) {
+            println("Invalid shared key.")
             return
         }
 
         context.dataStore.edit { settings ->
-            settings[serviceUUIDKey] = serviceUUID
-            settings[sharedPINKey] = sharedPIN
+            settings[serviceUUIDKey] = serviceUUID.lowercase()
+            settings[sharedKeyKey] = sharedKey
         }
 
         isFirstInitialising = true
         this.initOnConnectCallback = initOnConnectCallback
-        this.serviceUUID = serviceUUID
-        this.sharedPIN = sharedPIN
+        this.serviceUUID = serviceUUID.lowercase()
+        this.sharedKey = sharedKey
         initialize(context)
     }
 
     suspend fun initializeFromDataStore(context: Context) {
-        // Retrieve service UUID and PIN from DataStore
+        // Retrieve service UUID and Key from DataStore
         serviceUUID = context.dataStore.data.map { settings ->
             settings[serviceUUIDKey] ?: ""
         }.collect().toString()
 
-        sharedPIN = context.dataStore.data.map { settings ->
-            settings[sharedPINKey] ?: ""
+        sharedKey = context.dataStore.data.map { settings ->
+            settings[sharedKeyKey] ?: ""
         }.collect().toString()
 
         if (serviceUUID == "") {
@@ -177,8 +223,8 @@ class BluetoothModel {
             return
         }
 
-        if (sharedPIN == "") {
-            println("Error: Shared PIN not found in DataStore.")
+        if (sharedKey == "") {
+            println("Error: Shared Key not found in DataStore.")
             return
         }
 
@@ -233,5 +279,44 @@ class BluetoothModel {
         if (isScanning) {
             bluetoothAdapter.bluetoothLeScanner.stopScan(bleScanCallback)
         }
+    }
+
+    fun getCharacteristicForDevice(characteristicUUID: String): BluetoothGattCharacteristic? {
+        if (gatt == null) {
+            println("Error: No GATT device initialised.")
+            return null
+        }
+
+        with (gatt!!.services.find { it.uuid.toString() == serviceUUID }) {
+            if (this == null) {
+                println("Error: Cellular service could not be found")
+                return null
+            }
+
+            return characteristics.find { it.uuid.toString() == characteristicUUID }
+        }
+    }
+
+    fun shareHotspotDetails(ssid: String, password: String) {
+        if (gatt == null) {
+            println("Error: Device is unavailable.")
+            return
+        }
+        if (commandCharacteristic == null) {
+            println("Error: Command characteristic is unavailable")
+            return
+        }
+        if (ActivityCompat.checkSelfPermission(
+                context,
+                Manifest.permission.BLUETOOTH_CONNECT
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            println("Error: Bluetooth connect permission not granted")
+            return
+        }
+
+        commandCharacteristic!!.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+        commandCharacteristic!!.value = "0 $ssid $password".toByteArray()
+        gatt!!.writeCharacteristic(commandCharacteristic!!)
     }
 }
