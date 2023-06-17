@@ -20,6 +20,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.xuanhan.cellularcompanion.utilities.AES
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.map
 import java.util.regex.Pattern
@@ -33,6 +34,7 @@ class BluetoothModel {
     private lateinit var bluetoothManager: BluetoothManager
     private lateinit var context: Context
     private lateinit var bluetoothAdapter: BluetoothAdapter
+    private lateinit var aes: AES
     private val commandCharacteristicUUID = "00000001-0000-1000-8000-00805f9b34fb"
 
     private var serviceUUID: String? = null
@@ -187,11 +189,12 @@ class BluetoothModel {
         // Validate and store service UUID and Key in DataStore
         val uuidRegex =
             Pattern.compile("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
+        val alphaNumericRegex = Pattern.compile("^[a-zA-Z0-9]*$")
         if (!uuidRegex.matcher(serviceUUID).matches()) {
             println("Invalid service UUID.")
             return
         }
-        if (!uuidRegex.matcher(sharedKey).matches()) {
+        if (!alphaNumericRegex.matcher(sharedKey).matches()) {
             println("Invalid shared key.")
             return
         }
@@ -236,6 +239,7 @@ class BluetoothModel {
         this.context = context
         bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
         bluetoothAdapter = bluetoothManager.adapter
+        aes = AES(sharedKey!!)
 
         // Scan for BLE devices advertising this service UUID
         val filter =
@@ -316,7 +320,8 @@ class BluetoothModel {
         }
 
         commandCharacteristic!!.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
-        commandCharacteristic!!.value = "0 $ssid $password".toByteArray()
+        val (cipherText, iv) = aes.encrypt("$ssid $password")
+        commandCharacteristic!!.value = "0 $iv $cipherText".toByteArray()
         gatt!!.writeCharacteristic(commandCharacteristic!!)
     }
 }
