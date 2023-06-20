@@ -20,28 +20,21 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.ramcosta.composedestinations.annotation.Destination
 import com.ramcosta.composedestinations.navigation.DestinationsNavigator
-import com.xuanhan.cellularcompanion.destinations.HotspotInfoDestination
-import com.xuanhan.cellularcompanion.destinations.SettingUpDestination
 import com.xuanhan.cellularcompanion.viewmodels.SettingUpViewModel
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
 @Destination
-fun SettingUp(navigator: DestinationsNavigator, serviceUUID: String, sharedKey: String) {
+fun SettingUp2(navigator: DestinationsNavigator, ssid: String, password: String) {
     val currentContext = LocalContext.current
     val viewModel = remember { SettingUpViewModel(currentContext.applicationContext) }
     val coroutineScope = rememberCoroutineScope()
 
-    LaunchedEffect(keys = arrayOf(serviceUUID, sharedKey)) {
+    LaunchedEffect(keys = arrayOf(ssid, password)) {
         coroutineScope.launch {
-            viewModel.setupBluetooth(serviceUUID, sharedKey) {
-                coroutineScope.launch(context = Dispatchers.Main.immediate) {
-                    navigator.navigate(HotspotInfoDestination()) {
-                        popUpTo(SettingUpDestination.route) { inclusive = true }
-                    }
-                }
+            viewModel.shareHotspotDetails(ssid, password) {
+                println("Hotspot credentials shared successfully!")
             }
         }
     }
@@ -49,7 +42,7 @@ fun SettingUp(navigator: DestinationsNavigator, serviceUUID: String, sharedKey: 
     Scaffold(
         topBar = {
             LargeTopAppBar(
-                title = { Text(text = "Setting things up") },
+                title = { Text(text = "Finishing up") },
             )
         }
     ) {
@@ -63,7 +56,7 @@ fun SettingUp(navigator: DestinationsNavigator, serviceUUID: String, sharedKey: 
             Spacer(modifier = Modifier.weight(1f))
             CircularProgressIndicator()
             Spacer(modifier = Modifier.height(16.dp))
-            Text("Establishing a secure connection...")
+            Text("Sharing hotspot credentials...")
             Spacer(modifier = Modifier.weight(1f))
         }
     }

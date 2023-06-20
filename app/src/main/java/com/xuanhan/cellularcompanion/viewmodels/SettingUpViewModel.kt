@@ -1,21 +1,27 @@
 package com.xuanhan.cellularcompanion.viewmodels
 
 import android.content.Context
-import androidx.compose.runtime.mutableStateOf
 import com.xuanhan.cellularcompanion.bluetoothModel
 
 class SettingUpViewModel(private val context: Context) {
-    val loadingMessage = mutableStateOf("Establishing a secure connection...")
-
-    suspend fun setupBluetooth(serviceUUID: String, sharedKey: String) {
+    suspend fun setupBluetooth(
+        serviceUUID: String,
+        sharedKey: String,
+        onConnectCallback: () -> Unit
+    ) {
         bluetoothModel.initializeFromQR(
             serviceUUID,
             sharedKey,
-            initOnConnectCallback = {
-                loadingMessage.value = "Sharing hotspot credentials..."
-                bluetoothModel.shareHotspotDetails("test", "test")
-            },
+            initOnConnectCallback = onConnectCallback,
             context = context.applicationContext
+        )
+    }
+
+    fun shareHotspotDetails(ssid: String, password: String, onCompleteCallback: () -> Unit) {
+        bluetoothModel.shareHotspotDetails(
+            ssid,
+            password,
+            onHotspotDetailsSharedCallback = onCompleteCallback
         )
     }
 }

@@ -27,6 +27,7 @@ import androidx.core.app.ComponentActivity
 import androidx.core.content.ContextCompat
 import com.ramcosta.composedestinations.annotation.Destination
 import com.ramcosta.composedestinations.navigation.DestinationsNavigator
+import com.xuanhan.cellularcompanion.destinations.QRCodeDestination
 import com.xuanhan.cellularcompanion.destinations.SettingUpDestination
 import com.xuanhan.cellularcompanion.utilities.QRAnalyzer
 import org.json.JSONObject
@@ -107,7 +108,9 @@ fun PreviewViewComposable(navigator: DestinationsNavigator) {
                             val serviceUUID = data.get("serviceUUID").toString()
                             val sharedKey = data.get("sharedKey").toString()
 
-                            navigator.navigate(SettingUpDestination(serviceUUID, sharedKey))
+                            navigator.navigate(SettingUpDestination(serviceUUID, sharedKey)) {
+                                popUpTo(QRCodeDestination.route) { inclusive = true }
+                            }
                             it.clearAnalyzer()
                         })
                     }

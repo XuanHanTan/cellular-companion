@@ -49,6 +49,8 @@ class BluetoothModel {
 
     private var isFirstInitialising = false
     private var initOnConnectCallback: (() -> Unit)? = null
+    private var isSharingHotspotDetails = false
+    private var onHotspotDetailsSharedCallback: (() -> Unit)? = null
 
     private val bleScanCallback = object : ScanCallback() {
         override fun onScanResult(callbackType: Int, result: ScanResult) {
@@ -178,6 +180,25 @@ class BluetoothModel {
                 println("Error: MTU change failed with status $status")
             }
         }
+
+        override fun onCharacteristicWrite(
+            gatt: BluetoothGatt?,
+            characteristic: BluetoothGattCharacteristic?,
+            status: Int
+        ) {
+            super.onCharacteristicWrite(gatt, characteristic, status)
+
+            if (status == BluetoothGatt.GATT_SUCCESS) {
+                println("Wrote to characteristic ${characteristic!!.uuid}")
+
+                if (isSharingHotspotDetails) {
+                    onHotspotDetailsSharedCallback?.invoke()
+                }
+            } else {
+                // TODO: handle failed to write to characteristic
+                println("Error: Failed to write to characteristic ${characteristic!!.uuid} with status $status")
+            }
+        }
     }
 
     suspend fun initializeFromQR(
@@ -301,7 +322,7 @@ class BluetoothModel {
         }
     }
 
-    fun shareHotspotDetails(ssid: String, password: String) {
+    fun shareHotspotDetails(ssid: String, password: String, onHotspotDetailsSharedCallback: (() -> Unit)) {
         if (gatt == null) {
             println("Error: Device is unavailable.")
             return
@@ -318,6 +339,9 @@ class BluetoothModel {
             println("Error: Bluetooth connect permission not granted")
             return
         }
+
+        isSharingHotspotDetails = true
+        this.onHotspotDetailsSharedCallback = onHotspotDetailsSharedCallback
 
         commandCharacteristic!!.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
         val (cipherText, iv) = aes.encrypt("$ssid $password")
