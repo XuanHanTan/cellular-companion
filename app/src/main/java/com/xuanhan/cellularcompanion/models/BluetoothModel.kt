@@ -52,9 +52,19 @@ class BluetoothModel {
     private var isSharingHotspotDetails = false
     private var onHotspotDetailsSharedCallback: (() -> Unit)? = null
 
+    private var onScanFailedCallback: (() -> Unit)? = null
+    private var onUnexpectedErrorCallback: (() -> Unit)? = null
+    private var onConnectFailedCallback: (() -> Unit)? = null
+    private var onHotspotDetailsShareFailedCallback: (() -> Unit)? = null
+    val onErrorDismissedCallback = {
+        reset()
+        initialize(context)
+    }
+
     private val bleScanCallback = object : ScanCallback() {
         override fun onScanResult(callbackType: Int, result: ScanResult) {
             super.onScanResult(callbackType, result)
+
             with(result.device) {
                 if (ActivityCompat.checkSelfPermission(
                         context,
@@ -70,6 +80,7 @@ class BluetoothModel {
                 println("Found Bluetooth device: ${result.scanRecord?.serviceUuids} $name $address")
                 println("Now attempting to connect to Bluetooth device.")
 
+                isConnecting = true
                 connectDevice = this
                 connectGatt(context, false, gattCallback, BluetoothDevice.TRANSPORT_LE)
             }
@@ -79,18 +90,17 @@ class BluetoothModel {
             super.onScanFailed(errorCode)
             when (errorCode) {
                 SCAN_FAILED_APPLICATION_REGISTRATION_FAILED -> {
-                    // TODO: Handle scan failed
+                    onScanFailedCallback?.invoke()
                     println("Scan failed: restart Bluetooth and press Retry")
                 }
 
                 else -> {
-                    // TODO: Handle scan failed
+                    onScanFailedCallback?.invoke()
                     println("Scan failed with error code $errorCode")
                 }
             }
         }
     }
-
 
     private val gattCallback = object : BluetoothGattCallback() {
         override fun onConnectionStateChange(
@@ -118,19 +128,32 @@ class BluetoothModel {
 
                     gatt.discoverServices()
                 } else {
+                    // TODO: Handle unlinking device --> don't start scan
+                    startScan()
                     println("Disconnected from device advertising: ${gatt!!.device.address}")
                 }
             } else {
-                if (isConnecting && connectionRetryCount < 3) {
-                    connectionRetryCount++
-                    connectDevice!!.connectGatt(context, false, this, BluetoothDevice.TRANSPORT_LE)
-                    println("GATT connection failed but will retry: $status")
+                if (isConnecting) {
+                    if (connectionRetryCount < 3) {
+                        connectionRetryCount++
+                        connectDevice!!.connectGatt(
+                            context,
+                            false,
+                            this,
+                            BluetoothDevice.TRANSPORT_LE
+                        )
+                        println("GATT connection failed but will retry: $status")
+                    } else {
+                        onConnectFailedCallback?.invoke()
+                        startScan()
+                        println("Error: GATT connection failed with status $status")
+                    }
                 } else if (isDisconnecting && connectionRetryCount < 3) {
                     connectionRetryCount++
                     gatt!!.disconnect()
                     println("GATT disconnection failed but will retry: $status")
                 } else {
-                    println("Error: GATT connection failed with status $status")
+                    println("Error: GATT disconnection failed with status $status")
                 }
             }
         }
@@ -157,11 +180,11 @@ class BluetoothModel {
 
                     gatt.requestMtu(517)
                 } else {
-                    // TODO: handle failed to find service
+                    onUnexpectedErrorCallback?.invoke()
                     println("Could not find service.")
                 }
             } else {
-                // TODO: handle failed to connect to device
+                onUnexpectedErrorCallback?.invoke()
                 println("Service discovery failed due to internal error: $status")
             }
         }
@@ -172,11 +195,13 @@ class BluetoothModel {
             if (status == BluetoothGatt.GATT_SUCCESS) {
                 if (isFirstInitialising) {
                     initOnConnectCallback?.invoke()
+                    isFirstInitialising = false
+                    initOnConnectCallback = null
                 }
 
                 println("MTU changed to $mtu")
             } else {
-                // TODO: handle MTU change failed
+                onUnexpectedErrorCallback?.invoke()
                 println("Error: MTU change failed with status $status")
             }
         }
@@ -196,6 +221,9 @@ class BluetoothModel {
                 }
             } else {
                 // TODO: handle failed to write to characteristic
+                if (isSharingHotspotDetails) {
+                    onHotspotDetailsShareFailedCallback?.invoke()
+                }
                 println("Error: Failed to write to characteristic ${characteristic!!.uuid} with status $status")
             }
         }
@@ -262,11 +290,21 @@ class BluetoothModel {
         bluetoothAdapter = bluetoothManager.adapter
         aes = AES(sharedKey!!)
 
+        // Start BLE scan
+        startScan()
+    }
+
+    private fun startScan() {
         // Scan for BLE devices advertising this service UUID
         val filter =
             ScanFilter.Builder().setServiceUuid(ParcelUuid.fromString(serviceUUID)).build()
-        val scanSettings = ScanSettings.Builder()
-            .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
+        val scanSettings = ScanSettings.Builder().apply {
+            if (isFirstInitialising) {
+                setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
+            } else {
+                setScanMode(ScanSettings.SCAN_MODE_LOW_POWER)
+            }
+        }
             .setCallbackType(ScanSettings.CALLBACK_TYPE_FIRST_MATCH)
             .setMatchMode(ScanSettings.MATCH_MODE_STICKY)
             .build()
@@ -306,13 +344,13 @@ class BluetoothModel {
         }
     }
 
-    fun getCharacteristicForDevice(characteristicUUID: String): BluetoothGattCharacteristic? {
+    private fun getCharacteristicForDevice(characteristicUUID: String): BluetoothGattCharacteristic? {
         if (gatt == null) {
             println("Error: No GATT device initialised.")
             return null
         }
 
-        with (gatt!!.services.find { it.uuid.toString() == serviceUUID }) {
+        with(gatt!!.services.find { it.uuid.toString() == serviceUUID }) {
             if (this == null) {
                 println("Error: Cellular service could not be found")
                 return null
@@ -322,7 +360,11 @@ class BluetoothModel {
         }
     }
 
-    fun shareHotspotDetails(ssid: String, password: String, onHotspotDetailsSharedCallback: (() -> Unit)) {
+    fun shareHotspotDetails(
+        ssid: String,
+        password: String,
+        onHotspotDetailsSharedCallback: (() -> Unit)
+    ) {
         if (gatt == null) {
             println("Error: Device is unavailable.")
             return
@@ -347,5 +389,29 @@ class BluetoothModel {
         val (cipherText, iv) = aes.encrypt("$ssid $password")
         commandCharacteristic!!.value = "0 $iv $cipherText".toByteArray()
         gatt!!.writeCharacteristic(commandCharacteristic!!)
+    }
+
+    fun registerForErrorHandling(
+        onScanFailedCallback: () -> Unit,
+        onUnexpectedErrorCallback: () -> Unit,
+        onHotspotDetailsShareFailedCallback: () -> Unit,
+        onConnectFailedCallback: () -> Unit
+    ) {
+        this.onScanFailedCallback = onScanFailedCallback
+        this.onUnexpectedErrorCallback = onUnexpectedErrorCallback
+        this.onHotspotDetailsShareFailedCallback = onHotspotDetailsShareFailedCallback
+        this.onConnectFailedCallback = onConnectFailedCallback
+    }
+
+    private fun reset() {
+        stopScan()
+
+        connectDevice = null
+        gatt = null
+        commandCharacteristic = null
+        isScanning = false
+        isConnecting = false
+        isDisconnecting = false
+        connectionRetryCount = 0
     }
 }
