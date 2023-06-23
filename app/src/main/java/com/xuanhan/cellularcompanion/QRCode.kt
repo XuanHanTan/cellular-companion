@@ -25,9 +25,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.app.ComponentActivity
 import androidx.core.content.ContextCompat
+import androidx.navigation.NavController
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import com.ramcosta.composedestinations.annotation.Destination
 import com.ramcosta.composedestinations.navigation.DestinationsNavigator
-import com.xuanhan.cellularcompanion.destinations.QRCodeDestination
 import com.xuanhan.cellularcompanion.destinations.SettingUpDestination
 import com.xuanhan.cellularcompanion.utilities.QRAnalyzer
 import org.json.JSONObject
@@ -37,7 +38,7 @@ import java.util.concurrent.Executors
 @OptIn(ExperimentalMaterial3Api::class)
 @androidx.annotation.OptIn(androidx.camera.core.ExperimentalGetImage::class)
 @Destination
-fun QRCode(navigator: DestinationsNavigator) {
+fun QRCode(navigator: DestinationsNavigator, navController: NavController) {
     Scaffold(
         topBar = {
             LargeTopAppBar(
@@ -69,7 +70,7 @@ fun QRCode(navigator: DestinationsNavigator) {
                 modifier = Modifier.padding(horizontal = 16.dp)
             )
             Spacer(modifier = Modifier.weight(1f))
-            PreviewViewComposable(navigator = navigator)
+            PreviewViewComposable(navigator = navigator, navController = navController)
             Spacer(modifier = Modifier.weight(1f))
         }
     }
@@ -77,7 +78,7 @@ fun QRCode(navigator: DestinationsNavigator) {
 
 @androidx.camera.core.ExperimentalGetImage
 @Composable
-fun PreviewViewComposable(navigator: DestinationsNavigator) {
+fun PreviewViewComposable(navigator: DestinationsNavigator, navController: NavController) {
     AndroidView(
         { context ->
             val cameraExecutor = Executors.newSingleThreadExecutor()
@@ -109,9 +110,10 @@ fun PreviewViewComposable(navigator: DestinationsNavigator) {
                             val sharedKey = data.get("sharedKey").toString()
 
                             navigator.navigate(SettingUpDestination(serviceUUID, sharedKey)) {
-                                popUpTo(QRCodeDestination.route) { inclusive = true }
+                                popUpTo(navController.graph.findStartDestination().id) { inclusive = true }
                             }
                             it.clearAnalyzer()
+                            cameraProvider.unbindAll()
                         })
                     }
                 val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA

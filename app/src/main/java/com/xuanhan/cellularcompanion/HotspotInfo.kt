@@ -25,6 +25,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.ramcosta.composedestinations.annotation.Destination
 import com.ramcosta.composedestinations.navigation.DestinationsNavigator
+import com.xuanhan.cellularcompanion.destinations.HotspotInfoDestination
 import com.xuanhan.cellularcompanion.destinations.SettingUp2Destination
 
 @Composable
@@ -87,7 +88,9 @@ fun HotspotInfo(navigator: DestinationsNavigator) {
             )
             Spacer(modifier = Modifier.weight(1f))
             Button(onClick = {
-                navigator.navigate(SettingUp2Destination(ssid.value, password.value))
+                navigator.navigate(SettingUp2Destination(ssid.value, password.value)) {
+                    popUpTo(HotspotInfoDestination.route) { inclusive = true }
+                }
             }, enabled = ssid.value.isNotEmpty()) {
                 Text("Next")
             }

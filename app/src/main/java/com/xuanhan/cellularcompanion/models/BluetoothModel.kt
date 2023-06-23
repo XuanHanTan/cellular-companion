@@ -1,6 +1,7 @@
 package com.xuanhan.cellularcompanion.models
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothGatt
@@ -13,6 +14,7 @@ import android.bluetooth.le.ScanResult
 import android.bluetooth.le.ScanSettings
 import android.content.Context
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.ParcelUuid
 import androidx.core.app.ActivityCompat
 import androidx.datastore.core.DataStore
@@ -23,11 +25,14 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.xuanhan.cellularcompanion.utilities.AES
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.map
+import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.regex.Pattern
 
 val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
 
 class BluetoothModel {
+    private val operationQueue = ConcurrentLinkedQueue<() -> Unit>()
+    private var isRunningOperation = false
     private val serviceUUIDKey = stringPreferencesKey("serviceUUID")
     private val sharedKeyKey = stringPreferencesKey("sharedKey")
 
@@ -50,6 +55,7 @@ class BluetoothModel {
     private var isFirstInitialising = false
     private var initOnConnectCallback: (() -> Unit)? = null
     private var isSharingHotspotDetails = false
+    private var shareHotspotDetails2: (() -> Unit)? = null
     private var onHotspotDetailsSharedCallback: (() -> Unit)? = null
 
     private var onScanFailedCallback: (() -> Unit)? = null
@@ -66,12 +72,15 @@ class BluetoothModel {
             super.onScanResult(callbackType, result)
 
             with(result.device) {
-                if (ActivityCompat.checkSelfPermission(
-                        context,
-                        Manifest.permission.BLUETOOTH_CONNECT
-                    ) != PackageManager.PERMISSION_GRANTED
-                ) {
-                    return
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    if (ActivityCompat.checkSelfPermission(
+                            context,
+                            Manifest.permission.BLUETOOTH_CONNECT
+                        ) != PackageManager.PERMISSION_GRANTED
+                    ) {
+                        println("Error: The Bluetooth Connect permission has not been granted.")
+                        return
+                    }
                 }
 
                 stopScan()
@@ -91,11 +100,13 @@ class BluetoothModel {
             when (errorCode) {
                 SCAN_FAILED_APPLICATION_REGISTRATION_FAILED -> {
                     onScanFailedCallback?.invoke()
+                    indicateOperationComplete()
                     println("Scan failed: restart Bluetooth and press Retry")
                 }
 
                 else -> {
                     onScanFailedCallback?.invoke()
+                    indicateOperationComplete()
                     println("Scan failed with error code $errorCode")
                 }
             }
@@ -110,12 +121,15 @@ class BluetoothModel {
         ) {
             super.onConnectionStateChange(gatt, status, newState)
 
-            if (ActivityCompat.checkSelfPermission(
-                    context,
-                    Manifest.permission.BLUETOOTH_CONNECT
-                ) != PackageManager.PERMISSION_GRANTED
-            ) {
-                return
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                if (ActivityCompat.checkSelfPermission(
+                        context,
+                        Manifest.permission.BLUETOOTH_CONNECT
+                    ) != PackageManager.PERMISSION_GRANTED
+                ) {
+                    println("Error: The Bluetooth Connect permission has not been granted.")
+                    return
+                }
             }
 
             if (status == BluetoothGatt.GATT_SUCCESS) {
@@ -144,7 +158,9 @@ class BluetoothModel {
                         )
                         println("GATT connection failed but will retry: $status")
                     } else {
-                        onConnectFailedCallback?.invoke()
+                        if (isFirstInitialising) {
+                            onConnectFailedCallback?.invoke()
+                        }
                         startScan()
                         println("Error: GATT connection failed with status $status")
                     }
@@ -166,12 +182,15 @@ class BluetoothModel {
                 println("Discovered ${gatt!!.services.size} services for device ${gatt.device.address}")
 
                 if (gatt.services.find { it.uuid.toString() == serviceUUID } != null) {
-                    if (ActivityCompat.checkSelfPermission(
-                            context,
-                            Manifest.permission.BLUETOOTH_CONNECT
-                        ) != PackageManager.PERMISSION_GRANTED
-                    ) {
-                        return
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        if (ActivityCompat.checkSelfPermission(
+                                context,
+                                Manifest.permission.BLUETOOTH_CONNECT
+                            ) != PackageManager.PERMISSION_GRANTED
+                        ) {
+                            println("Error: The Bluetooth Connect permission has not been granted.")
+                            return
+                        }
                     }
 
                     println("Found Cellular service!")
@@ -181,10 +200,12 @@ class BluetoothModel {
                     gatt.requestMtu(517)
                 } else {
                     onUnexpectedErrorCallback?.invoke()
+                    indicateOperationComplete()
                     println("Could not find service.")
                 }
             } else {
                 onUnexpectedErrorCallback?.invoke()
+                indicateOperationComplete()
                 println("Service discovery failed due to internal error: $status")
             }
         }
@@ -194,14 +215,15 @@ class BluetoothModel {
 
             if (status == BluetoothGatt.GATT_SUCCESS) {
                 if (isFirstInitialising) {
-                    initOnConnectCallback?.invoke()
-                    isFirstInitialising = false
-                    initOnConnectCallback = null
+                    initialize2()
+                } else if (isSharingHotspotDetails) {
+                    shareHotspotDetails2?.invoke()
                 }
 
                 println("MTU changed to $mtu")
             } else {
                 onUnexpectedErrorCallback?.invoke()
+                indicateOperationComplete()
                 println("Error: MTU change failed with status $status")
             }
         }
@@ -216,17 +238,49 @@ class BluetoothModel {
             if (status == BluetoothGatt.GATT_SUCCESS) {
                 println("Wrote to characteristic ${characteristic!!.uuid}")
 
-                if (isSharingHotspotDetails) {
+                if (isFirstInitialising) {
+                    initOnConnectCallback?.invoke()
+                    isFirstInitialising = false
+                    initOnConnectCallback = null
+                    indicateOperationComplete()
+                } else if (isSharingHotspotDetails) {
                     onHotspotDetailsSharedCallback?.invoke()
+                    isSharingHotspotDetails = false
+                    onHotspotDetailsSharedCallback = null
+                    indicateOperationComplete()
                 }
             } else {
-                // TODO: handle failed to write to characteristic
-                if (isSharingHotspotDetails) {
-                    onHotspotDetailsShareFailedCallback?.invoke()
-                }
                 println("Error: Failed to write to characteristic ${characteristic!!.uuid} with status $status")
+
+                if (isFirstInitialising) {
+                    onConnectFailedCallback?.invoke()
+                    indicateOperationComplete()
+                } else if (isSharingHotspotDetails) {
+                    onHotspotDetailsShareFailedCallback?.invoke()
+                    indicateOperationComplete()
+                }
             }
         }
+    }
+
+    @Synchronized
+    private fun enqueueOperation(operation: () -> Unit) {
+        operationQueue.add(operation)
+        if (!isRunningOperation) {
+            doNextOperation()
+        }
+    }
+
+    @Synchronized
+    private fun doNextOperation() {
+        isRunningOperation = true
+        operationQueue.poll()?.invoke()
+    }
+
+    @Synchronized
+    private fun indicateOperationComplete() {
+        isRunningOperation = false
+        doNextOperation()
     }
 
     suspend fun initializeFromQR(
@@ -294,6 +348,23 @@ class BluetoothModel {
         startScan()
     }
 
+    private fun initialize2() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (ActivityCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.BLUETOOTH_CONNECT
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                println("Error: The Bluetooth Connect permission has not been granted.")
+                return
+            }
+        }
+
+        commandCharacteristic!!.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+        commandCharacteristic!!.value = "0".toByteArray()
+        gatt!!.writeCharacteristic(commandCharacteristic!!)
+    }
+
     private fun startScan() {
         // Scan for BLE devices advertising this service UUID
         val filter =
@@ -305,21 +376,20 @@ class BluetoothModel {
                 setScanMode(ScanSettings.SCAN_MODE_LOW_POWER)
             }
         }
-            .setCallbackType(ScanSettings.CALLBACK_TYPE_FIRST_MATCH)
+            .setCallbackType(ScanSettings.CALLBACK_TYPE_ALL_MATCHES)
             .setMatchMode(ScanSettings.MATCH_MODE_STICKY)
             .build()
 
         // Start BLE scan
-        if (ActivityCompat.checkSelfPermission(
-                context,
-                Manifest.permission.BLUETOOTH_SCAN
-            ) != PackageManager.PERMISSION_GRANTED
-            || ActivityCompat.checkSelfPermission(
-                context,
-                Manifest.permission.BLUETOOTH_CONNECT
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
-            return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (ActivityCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.BLUETOOTH_SCAN
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                println("Error: The Bluetooth Scan permission has not been granted.")
+                return
+            }
         }
 
         bluetoothAdapter.bluetoothLeScanner.startScan(
@@ -331,12 +401,15 @@ class BluetoothModel {
     }
 
     fun stopScan() {
-        if (ActivityCompat.checkSelfPermission(
-                context,
-                Manifest.permission.BLUETOOTH_SCAN
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
-            return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (ActivityCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.BLUETOOTH_SCAN
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                println("Error: The Bluetooth Scan permission has not been granted.")
+                return
+            }
         }
 
         if (isScanning) {
@@ -363,7 +436,7 @@ class BluetoothModel {
     fun shareHotspotDetails(
         ssid: String,
         password: String,
-        onHotspotDetailsSharedCallback: (() -> Unit)
+        onHotspotDetailsSharedCallback: () -> Unit
     ) {
         if (gatt == null) {
             println("Error: Device is unavailable.")
@@ -373,22 +446,38 @@ class BluetoothModel {
             println("Error: Command characteristic is unavailable")
             return
         }
-        if (ActivityCompat.checkSelfPermission(
-                context,
-                Manifest.permission.BLUETOOTH_CONNECT
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
-            println("Error: Bluetooth connect permission not granted")
-            return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (ActivityCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.BLUETOOTH_CONNECT
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                println("Error: The Bluetooth Connect permission has not been granted.")
+                return
+            }
         }
 
+        enqueueOperation {
+            startShareHotspotDetails(ssid, password, onHotspotDetailsSharedCallback)
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun startShareHotspotDetails(
+        ssid: String,
+        password: String,
+        onHotspotDetailsSharedCallback: () -> Unit
+    ) {
         isSharingHotspotDetails = true
         this.onHotspotDetailsSharedCallback = onHotspotDetailsSharedCallback
 
-        commandCharacteristic!!.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
-        val (cipherText, iv) = aes.encrypt("$ssid $password")
-        commandCharacteristic!!.value = "0 $iv $cipherText".toByteArray()
-        gatt!!.writeCharacteristic(commandCharacteristic!!)
+        startScan()
+        shareHotspotDetails2 = {
+            commandCharacteristic!!.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+            val (cipherText, iv) = aes.encrypt("$ssid $password")
+            commandCharacteristic!!.value = "1 $iv $cipherText".toByteArray()
+            gatt!!.writeCharacteristic(commandCharacteristic!!)
+        }
     }
 
     fun registerForErrorHandling(
