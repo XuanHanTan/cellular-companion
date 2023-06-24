@@ -8,6 +8,7 @@ import android.bluetooth.BluetoothGatt
 import android.bluetooth.BluetoothGattCallback
 import android.bluetooth.BluetoothGattCharacteristic
 import android.bluetooth.BluetoothManager
+import android.bluetooth.BluetoothProfile
 import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanFilter
 import android.bluetooth.le.ScanResult
@@ -273,8 +274,10 @@ class BluetoothModel {
 
     @Synchronized
     private fun doNextOperation() {
-        isRunningOperation = true
-        operationQueue.poll()?.invoke()
+        operationQueue.poll()?.let {
+            isRunningOperation = true
+            it.invoke()
+        }
     }
 
     @Synchronized
@@ -471,12 +474,17 @@ class BluetoothModel {
         isSharingHotspotDetails = true
         this.onHotspotDetailsSharedCallback = onHotspotDetailsSharedCallback
 
-        startScan()
         shareHotspotDetails2 = {
             commandCharacteristic!!.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
             val (cipherText, iv) = aes.encrypt("$ssid $password")
             commandCharacteristic!!.value = "1 $iv $cipherText".toByteArray()
             gatt!!.writeCharacteristic(commandCharacteristic!!)
+        }
+
+        if (bluetoothManager.getConnectedDevices(BluetoothProfile.GATT).find { it.address == connectDevice?.address } == null) {
+            startScan()
+        } else {
+            shareHotspotDetails2!!.invoke()
         }
     }
 
