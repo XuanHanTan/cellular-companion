@@ -35,12 +35,10 @@ fun SettingUp(navigator: DestinationsNavigator, serviceUUID: String, sharedKey: 
     val coroutineScope = rememberCoroutineScope()
 
     LaunchedEffect(keys = arrayOf(serviceUUID, sharedKey)) {
-        coroutineScope.launch {
-            viewModel.setupBluetooth(serviceUUID, sharedKey) {
-                coroutineScope.launch(context = Dispatchers.Main.immediate) {
-                    navigator.navigate(HotspotInfoDestination()) {
-                        popUpTo(SettingUpDestination.route) { inclusive = true }
-                    }
+        viewModel.setupBluetooth(serviceUUID, sharedKey) {
+            coroutineScope.launch(context = Dispatchers.Main.immediate) {
+                navigator.navigate(HotspotInfoDestination()) {
+                    popUpTo(SettingUpDestination.route) { inclusive = true }
                 }
             }
         }

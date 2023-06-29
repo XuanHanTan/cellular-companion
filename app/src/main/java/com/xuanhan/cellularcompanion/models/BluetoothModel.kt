@@ -68,11 +68,15 @@ class BluetoothModel {
         initialize(context)
     }
 
+    /**
+     * This callback handles results during BLE scans.
+     * */
     private val bleScanCallback = object : ScanCallback() {
         override fun onScanResult(callbackType: Int, result: ScanResult) {
             super.onScanResult(callbackType, result)
 
             with(result.device) {
+                // Check for Bluetooth Connect permission on Android 12+
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                     if (ActivityCompat.checkSelfPermission(
                             context,
@@ -84,12 +88,14 @@ class BluetoothModel {
                     }
                 }
 
+                // Stop scan
                 stopScan()
                 isScanning = false
 
                 println("Found Bluetooth device: ${result.scanRecord?.serviceUuids} $name $address")
                 println("Now attempting to connect to Bluetooth device.")
 
+                // Connect to the device
                 isConnecting = true
                 connectDevice = this
                 connectGatt(context, false, gattCallback, BluetoothDevice.TRANSPORT_LE)
@@ -114,6 +120,9 @@ class BluetoothModel {
         }
     }
 
+    /**
+     * This callback handles results during GATT connections.
+     * */
     private val gattCallback = object : BluetoothGattCallback() {
         override fun onConnectionStateChange(
             gatt: BluetoothGatt?,
@@ -122,6 +131,7 @@ class BluetoothModel {
         ) {
             super.onConnectionStateChange(gatt, status, newState)
 
+            // Check for Bluetooth Connect permission on Android 12+
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 if (ActivityCompat.checkSelfPermission(
                         context,
@@ -134,21 +144,26 @@ class BluetoothModel {
             }
 
             if (status == BluetoothGatt.GATT_SUCCESS) {
+                // Reset connection retry counter
                 connectionRetryCount = 0
 
                 if (newState == BluetoothGatt.STATE_CONNECTED) {
+                    // Save GATT device for later reference
                     this@BluetoothModel.gatt = gatt
 
                     println("Connected to device ${gatt!!.device.address}")
 
+                    // Start discovering services of GATT device
                     gatt.discoverServices()
                 } else {
+                    // Start scan for devices if disconnected due to issues such as out of range, device powered off etc.
                     // TODO: Handle unlinking device --> don't start scan
                     startScan()
                     println("Disconnected from device advertising: ${gatt!!.device.address}")
                 }
             } else {
                 if (isConnecting) {
+                    // Retry connection if it fails (up to 3 times)
                     if (connectionRetryCount < 3) {
                         connectionRetryCount++
                         connectDevice!!.connectGatt(
@@ -159,13 +174,18 @@ class BluetoothModel {
                         )
                         println("GATT connection failed but will retry: $status")
                     } else {
+                        // Run connect failed callback only during setup
                         if (isFirstInitialising) {
                             onConnectFailedCallback?.invoke()
                         }
+
+                        // Start scan for devices again
                         startScan()
+
                         println("Error: GATT connection failed with status $status")
                     }
                 } else if (isDisconnecting && connectionRetryCount < 3) {
+                    // Retry disconnection if it fails (up to 3 times)
                     connectionRetryCount++
                     gatt!!.disconnect()
                     println("GATT disconnection failed but will retry: $status")
@@ -182,7 +202,9 @@ class BluetoothModel {
             if (status == BluetoothGatt.GATT_SUCCESS) {
                 println("Discovered ${gatt!!.services.size} services for device ${gatt.device.address}")
 
+                // Check if the device has the Cellular service
                 if (gatt.services.find { it.uuid.toString() == serviceUUID } != null) {
+                    // Check for Bluetooth Connect permission on Android 12+
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                         if (ActivityCompat.checkSelfPermission(
                                 context,
@@ -196,8 +218,10 @@ class BluetoothModel {
 
                     println("Found Cellular service!")
 
+                    // Store the reference to the command characteristic for the Cellular service
                     commandCharacteristic = getCharacteristicForDevice(commandCharacteristicUUID)
 
+                    // Request for a larger maximum transmission unit (MTU) size
                     gatt.requestMtu(517)
                 } else {
                     onUnexpectedErrorCallback?.invoke()
@@ -216,8 +240,10 @@ class BluetoothModel {
 
             if (status == BluetoothGatt.GATT_SUCCESS) {
                 if (isFirstInitialising) {
+                    // Continue next part of setup (sending Hello World command)
                     initialize2()
                 } else if (isSharingHotspotDetails) {
+                    // Share hotspot details to device
                     shareHotspotDetails2?.invoke()
                 }
 
@@ -239,15 +265,12 @@ class BluetoothModel {
             if (status == BluetoothGatt.GATT_SUCCESS) {
                 println("Wrote to characteristic ${characteristic!!.uuid}")
 
+                // Run the next operation
                 if (isFirstInitialising) {
                     initOnConnectCallback?.invoke()
-                    isFirstInitialising = false
-                    initOnConnectCallback = null
                     indicateOperationComplete()
                 } else if (isSharingHotspotDetails) {
                     onHotspotDetailsSharedCallback?.invoke()
-                    isSharingHotspotDetails = false
-                    onHotspotDetailsSharedCallback = null
                     indicateOperationComplete()
                 }
             } else {
@@ -276,6 +299,13 @@ class BluetoothModel {
     private fun doNextOperation() {
         operationQueue.poll()?.let {
             isRunningOperation = true
+
+            // Reset indicators of commands
+            isFirstInitialising = false
+            initOnConnectCallback = null
+            isSharingHotspotDetails = false
+            onHotspotDetailsSharedCallback = null
+
             it.invoke()
         }
     }
@@ -286,13 +316,20 @@ class BluetoothModel {
         doNextOperation()
     }
 
+    /**
+     * This function initialises a new Bluetooth connection with a device running the Cellular app using data from a QR code.
+     * @param serviceUUID The BLE service UUID of the device running the Cellular app.
+     * @param sharedKey The shared key of the device running the Cellular app.
+     * @param initOnConnectCallback The callback to run when the connection is successfully initialised.
+     * @param context The context of the application that calls this function.
+     * */
     suspend fun initializeFromQR(
         serviceUUID: String,
         sharedKey: String,
         initOnConnectCallback: () -> (Unit),
         context: Context
     ) {
-        // Validate and store service UUID and Key in DataStore
+        // Validate service UUID and Key
         val uuidRegex =
             Pattern.compile("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
         val alphaNumericRegex = Pattern.compile("^[a-zA-Z0-9]*$")
@@ -305,6 +342,7 @@ class BluetoothModel {
             return
         }
 
+        // Store service UUID and Key in DataStore
         context.dataStore.edit { settings ->
             settings[serviceUUIDKey] = serviceUUID.lowercase()
             settings[sharedKeyKey] = sharedKey
@@ -317,12 +355,15 @@ class BluetoothModel {
         initialize(context)
     }
 
+    /**
+     * This function initialises a Bluetooth connection with a device running the Cellular app using stored credentials.
+     * @param context The context of the application that calls this function.
+     * */
     suspend fun initializeFromDataStore(context: Context) {
         // Retrieve service UUID and Key from DataStore
         serviceUUID = context.dataStore.data.map { settings ->
             settings[serviceUUIDKey] ?: ""
         }.collect().toString()
-
         sharedKey = context.dataStore.data.map { settings ->
             settings[sharedKeyKey] ?: ""
         }.collect().toString()
@@ -340,6 +381,9 @@ class BluetoothModel {
         initialize(context)
     }
 
+    /**
+     * This function starts the scan for BLE devices when initialising.
+     * */
     private fun initialize(context: Context) {
         // Initialise context and BluetoothManager
         this.context = context
@@ -351,7 +395,11 @@ class BluetoothModel {
         startScan()
     }
 
+    /**
+     * This function continues the second part of setup - sending the Hello World command to the device.
+     * */
     private fun initialize2() {
+        // Check for Bluetooth Connect permission on Android 12+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             if (ActivityCompat.checkSelfPermission(
                     context,
@@ -363,11 +411,15 @@ class BluetoothModel {
             }
         }
 
+        // Write Hello World command to command characteristic
         commandCharacteristic!!.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
         commandCharacteristic!!.value = "0".toByteArray()
         gatt!!.writeCharacteristic(commandCharacteristic!!)
     }
 
+    /**
+     * This function starts the scan for BLE devices matching the set service UUID. The serviceUUID variable has to be set before calling this function.
+     * */
     private fun startScan() {
         // Scan for BLE devices advertising this service UUID
         val filter =
@@ -403,23 +455,31 @@ class BluetoothModel {
         isScanning = true
     }
 
-    fun stopScan() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            if (ActivityCompat.checkSelfPermission(
-                    context,
-                    Manifest.permission.BLUETOOTH_SCAN
-                ) != PackageManager.PERMISSION_GRANTED
-            ) {
-                println("Error: The Bluetooth Scan permission has not been granted.")
-                return
-            }
-        }
-
+    /**
+     * This function stops the scan for BLE devices if it is running.
+     * */
+    private fun stopScan() {
         if (isScanning) {
+            // Check for Bluetooth Connect permission on Android 12+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                if (ActivityCompat.checkSelfPermission(
+                        context,
+                        Manifest.permission.BLUETOOTH_SCAN
+                    ) != PackageManager.PERMISSION_GRANTED
+                ) {
+                    println("Error: The Bluetooth Scan permission has not been granted.")
+                    return
+                }
+            }
+
+            // Stop BLE scan
             bluetoothAdapter.bluetoothLeScanner.stopScan(bleScanCallback)
         }
     }
 
+    /**
+     * This function gets a characteristic reference based on its UUID from the GATT device. The GATT device's services must be discovered before calling this function.
+     * */
     private fun getCharacteristicForDevice(characteristicUUID: String): BluetoothGattCharacteristic? {
         if (gatt == null) {
             println("Error: No GATT device initialised.")
@@ -436,6 +496,12 @@ class BluetoothModel {
         }
     }
 
+    /**
+     * This function shares the hotspot details with the device running the Cellular app. This is a public function to enqueue this operation.
+     * @param ssid The SSID of the hotspot to connect to.
+     * @param password The password of the hotspot to connect to.
+     * @param onHotspotDetailsSharedCallback The callback function to be called when the hotspot details have been shared.
+     * */
     fun shareHotspotDetails(
         ssid: String,
         password: String,
@@ -449,6 +515,8 @@ class BluetoothModel {
             println("Error: Command characteristic is unavailable")
             return
         }
+
+        // Check for Bluetooth Connect permission on Android 12+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             if (ActivityCompat.checkSelfPermission(
                     context,
@@ -460,11 +528,18 @@ class BluetoothModel {
             }
         }
 
+        // Enqueue operation to share hotspot details
         enqueueOperation {
             startShareHotspotDetails(ssid, password, onHotspotDetailsSharedCallback)
         }
     }
 
+    /**
+     * This function shares the hotspot details with the device running the Cellular app.
+     * @param ssid The SSID of the hotspot to connect to.
+     * @param password The password of the hotspot to connect to.
+     * @param onHotspotDetailsSharedCallback The callback function to be called when the hotspot details have been shared.
+     * */
     @SuppressLint("MissingPermission")
     private fun startShareHotspotDetails(
         ssid: String,
@@ -481,13 +556,22 @@ class BluetoothModel {
             gatt!!.writeCharacteristic(commandCharacteristic!!)
         }
 
-        if (bluetoothManager.getConnectedDevices(BluetoothProfile.GATT).find { it.address == connectDevice?.address } == null) {
+        if (bluetoothManager.getConnectedDevices(BluetoothProfile.GATT)
+                .find { it.address == connectDevice?.address } == null
+        ) {
             startScan()
         } else {
             shareHotspotDetails2!!.invoke()
         }
     }
 
+    /**
+     * This function registers callbacks from a view model for error handling.
+     * @param onScanFailedCallback The callback function to be called when BLE scans fail.
+     * @param onUnexpectedErrorCallback The callback function to be called when an unexpected error occurs.
+     * @param onHotspotDetailsShareFailedCallback The callback function to be called when sharing hotspot details fails.
+     * @param onConnectFailedCallback The callback function to be called when connecting to a device fails.
+     * */
     fun registerForErrorHandling(
         onScanFailedCallback: () -> Unit,
         onUnexpectedErrorCallback: () -> Unit,
@@ -500,6 +584,9 @@ class BluetoothModel {
         this.onConnectFailedCallback = onConnectFailedCallback
     }
 
+    /**
+     * This function resets the BLE connection to allow reconnecting to a BLE device.
+     * */
     private fun reset() {
         stopScan()
 
