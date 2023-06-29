@@ -31,6 +31,9 @@ import java.util.regex.Pattern
 
 val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
 
+/**
+ * This class handles all things related to connecting to and communicating with the Cellular app on the Mac.
+ * */
 class BluetoothModel {
     private val operationQueue = ConcurrentLinkedQueue<() -> Unit>()
     private var isRunningOperation = false
