@@ -24,4 +24,8 @@ class SettingUpViewModel(private val context: Context) {
             onHotspotDetailsSharedCallback = onCompleteCallback
         )
     }
+
+    suspend fun completeSetup() {
+        bluetoothModel.markSetupComplete()
+    }
 }

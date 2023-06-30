@@ -13,6 +13,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -20,6 +21,8 @@ import androidx.compose.ui.unit.dp
 import com.ramcosta.composedestinations.annotation.Destination
 import com.ramcosta.composedestinations.navigation.DestinationsNavigator
 import com.xuanhan.cellularcompanion.viewmodels.SettingUpViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
@@ -27,10 +30,15 @@ import com.xuanhan.cellularcompanion.viewmodels.SettingUpViewModel
 fun SettingUp2(navigator: DestinationsNavigator, ssid: String, password: String) {
     val currentContext = LocalContext.current
     val viewModel = remember { SettingUpViewModel(currentContext.applicationContext) }
+    val coroutineScope = rememberCoroutineScope()
 
     LaunchedEffect(keys = arrayOf(ssid, password)) {
         viewModel.shareHotspotDetails(ssid, password) {
             println("Hotspot credentials shared successfully!")
+            coroutineScope.launch(context = Dispatchers.IO) {
+                viewModel.completeSetup()
+                // TODO: Navigate to the Start page
+            }
         }
     }
 

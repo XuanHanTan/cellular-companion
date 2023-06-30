@@ -26,9 +26,10 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.app.ComponentActivity
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavController
-import androidx.navigation.NavGraph.Companion.findStartDestination
 import com.ramcosta.composedestinations.annotation.Destination
 import com.ramcosta.composedestinations.navigation.DestinationsNavigator
+import com.ramcosta.composedestinations.navigation.popUpTo
+import com.xuanhan.cellularcompanion.destinations.IntroDestination
 import com.xuanhan.cellularcompanion.destinations.SettingUpDestination
 import com.xuanhan.cellularcompanion.utilities.QRAnalyzer
 import org.json.JSONObject
@@ -110,7 +111,7 @@ fun PreviewViewComposable(navigator: DestinationsNavigator, navController: NavCo
                             val sharedKey = data.get("sharedKey").toString()
 
                             navigator.navigate(SettingUpDestination(serviceUUID, sharedKey)) {
-                                popUpTo(navController.graph.findStartDestination().id) { inclusive = true }
+                                popUpTo(IntroDestination) { inclusive = true }
                             }
                             it.clearAnalyzer()
                             cameraProvider.unbindAll()

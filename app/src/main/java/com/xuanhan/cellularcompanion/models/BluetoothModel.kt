@@ -20,11 +20,12 @@ import android.os.ParcelUuid
 import androidx.core.app.ActivityCompat
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.xuanhan.cellularcompanion.utilities.AES
-import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.regex.Pattern
@@ -39,6 +40,7 @@ class BluetoothModel {
     private var isRunningOperation = false
     private val serviceUUIDKey = stringPreferencesKey("serviceUUID")
     private val sharedKeyKey = stringPreferencesKey("sharedKey")
+    val isSetupCompleteKey = booleanPreferencesKey("isSetupComplete")
 
     private lateinit var bluetoothManager: BluetoothManager
     private lateinit var context: Context
@@ -55,6 +57,7 @@ class BluetoothModel {
     private var isConnecting = false
     private var isDisconnecting = false
     private var connectionRetryCount = 0
+    var isSetupComplete = false
 
     private var isFirstInitialising = false
     private var initOnConnectCallback: (() -> Unit)? = null
@@ -366,10 +369,13 @@ class BluetoothModel {
         // Retrieve service UUID and Key from DataStore
         serviceUUID = context.dataStore.data.map { settings ->
             settings[serviceUUIDKey] ?: ""
-        }.collect().toString()
+        }.first()
         sharedKey = context.dataStore.data.map { settings ->
             settings[sharedKeyKey] ?: ""
-        }.collect().toString()
+        }.first()
+        isSetupComplete = context.dataStore.data.map { settings ->
+            settings[isSetupCompleteKey] ?: false
+        }.first()
 
         if (serviceUUID == "") {
             println("Error: Service UUID not found in DataStore.")
@@ -565,6 +571,12 @@ class BluetoothModel {
             startScan()
         } else {
             shareHotspotDetails2!!.invoke()
+        }
+    }
+
+    suspend fun markSetupComplete() {
+        context.dataStore.edit { settings ->
+            settings[isSetupCompleteKey] = true
         }
     }
 

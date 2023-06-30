@@ -22,7 +22,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
@@ -111,7 +110,7 @@ fun Permissions(navigator: DestinationsNavigator) {
                                 Icon(
                                     painter = painterResource(id = R.drawable.outline_done_24),
                                     contentDescription = "Permission granted",
-                                    tint = Color(0xFF1C850B)
+                                    tint = MaterialTheme.colorScheme.primary
                                 )
                             }
 
@@ -120,13 +119,13 @@ fun Permissions(navigator: DestinationsNavigator) {
                                     Icon(
                                         painter = painterResource(id = R.drawable.outline_close_24),
                                         contentDescription = "Permission denied",
-                                        tint = Color(0xFFA91C1C)
+                                        tint = MaterialTheme.colorScheme.error
                                     )
                                 } else {
                                     Icon(
                                         painter = painterResource(id = R.drawable.outline_done_24),
                                         contentDescription = "Permission granted",
-                                        tint = Color(0xFF848484)
+                                        tint = MaterialTheme.colorScheme.outline
                                     )
                                 }
                             }
@@ -149,6 +148,7 @@ fun Permissions(navigator: DestinationsNavigator) {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                         btConnectPermission!!.launchPermissionRequest()
                     }
+                    // TODO: Ensure that BT is on
                     navigator.navigate(QRCodeDestination())
                 }) {
                     Text("Next")
