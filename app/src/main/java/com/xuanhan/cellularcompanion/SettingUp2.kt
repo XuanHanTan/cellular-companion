@@ -20,6 +20,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.ramcosta.composedestinations.annotation.Destination
 import com.ramcosta.composedestinations.navigation.DestinationsNavigator
+import com.xuanhan.cellularcompanion.destinations.StartDestination
 import com.xuanhan.cellularcompanion.viewmodels.SettingUpViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -37,7 +38,9 @@ fun SettingUp2(navigator: DestinationsNavigator, ssid: String, password: String)
             println("Hotspot credentials shared successfully!")
             coroutineScope.launch(context = Dispatchers.IO) {
                 viewModel.completeSetup()
-                // TODO: Navigate to the Start page
+                coroutineScope.launch(context = Dispatchers.Main.immediate) {
+                    navigator.navigate(StartDestination)
+                }
             }
         }
     }

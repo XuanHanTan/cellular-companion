@@ -1,7 +1,14 @@
 package com.xuanhan.cellularcompanion
 
 import android.Manifest
+import android.app.Activity.RESULT_OK
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothManager
+import android.content.Context
+import android.content.Intent
 import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.scrollable
@@ -22,6 +29,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
@@ -37,6 +45,7 @@ import com.xuanhan.cellularcompanion.viewmodels.PermissionViewModel
 @Composable
 @Destination
 fun Permissions(navigator: DestinationsNavigator) {
+    val context = LocalContext.current
     val btConnectPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
         rememberPermissionState(permission = Manifest.permission.BLUETOOTH_CONNECT)
     } else {
@@ -69,6 +78,14 @@ fun Permissions(navigator: DestinationsNavigator) {
         )
     }
     val scrollState = rememberScrollState()
+    val enableBt = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult(),
+        onResult = {
+            if (it.resultCode == RESULT_OK) {
+                requiresBtPermissionCheck = true
+                navigator.navigate(QRCodeDestination)
+            }
+        })
 
     Scaffold(
         topBar = {
@@ -148,8 +165,17 @@ fun Permissions(navigator: DestinationsNavigator) {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                         btConnectPermission!!.launchPermissionRequest()
                     }
-                    // TODO: Ensure that BT is on
-                    navigator.navigate(QRCodeDestination())
+
+                    val bluetoothManager =
+                        context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
+                    val bluetoothAdapter = bluetoothManager.adapter
+                    if (!bluetoothAdapter.isEnabled) {
+                        val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
+                        enableBt.launch(enableBtIntent)
+                    } else {
+                        navigator.navigate(QRCodeDestination())
+                        requiresBtPermissionCheck = true
+                    }
                 }) {
                     Text("Next")
                 }

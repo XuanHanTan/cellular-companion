@@ -1,6 +1,9 @@
 package com.xuanhan.cellularcompanion.viewmodels
 
+import android.bluetooth.BluetoothManager
+import android.content.Context
 import com.xuanhan.cellularcompanion.bluetoothModel
+import com.xuanhan.cellularcompanion.requiresBtPermissionCheck
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -17,6 +20,9 @@ class MainViewModel {
     private val _isShowingConnectFailedDialog = MutableStateFlow(false)
     val isShowingConnectFailedDialog: StateFlow<Boolean> =
         _isShowingConnectFailedDialog.asStateFlow()
+    private val _isBluetoothEnabled = MutableStateFlow(true)
+    val isBluetoothEnabled: StateFlow<Boolean> =
+        _isBluetoothEnabled.asStateFlow()
 
     init {
         bluetoothModel.registerForErrorHandling(
@@ -61,5 +67,17 @@ class MainViewModel {
     fun confirmConnectFailedDialog() {
         _isShowingConnectFailedDialog.value = false
         bluetoothModel.onErrorDismissedCallback()
+    }
+
+    fun setBluetoothEnabled(context: Context): Boolean {
+        if (!requiresBtPermissionCheck) {
+            _isBluetoothEnabled.value = true
+        } else {
+            val bluetoothManager =
+                context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
+            val bluetoothAdapter = bluetoothManager.adapter
+            _isBluetoothEnabled.value = bluetoothAdapter.isEnabled
+        }
+        return _isBluetoothEnabled.value
     }
 }
