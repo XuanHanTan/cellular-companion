@@ -75,7 +75,6 @@ fun HomePage(navigator: DestinationsNavigator, homePageViewModel: HomePageViewMo
                         contentColor = Color(0xFF1C850B)
                     ),
                     interactionSource = interactionSource,
-
                     ) {
                     Icon(
                         painter = painterResource(id = R.drawable.outline_wifi_tethering_24),

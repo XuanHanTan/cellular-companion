@@ -3,8 +3,12 @@ package com.xuanhan.cellularcompanion
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.bluetooth.BluetoothAdapter
+import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
+import android.content.ServiceConnection
 import android.os.Bundle
+import android.os.IBinder
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.ActivityResult
@@ -34,12 +38,14 @@ import com.ramcosta.composedestinations.animations.defaults.RootNavGraphDefaultA
 import com.ramcosta.composedestinations.animations.rememberAnimatedNavHostEngine
 import com.xuanhan.cellularcompanion.destinations.StartDestination
 import com.xuanhan.cellularcompanion.models.BluetoothModel
+import com.xuanhan.cellularcompanion.services.BluetoothService
 import com.xuanhan.cellularcompanion.ui.theme.AppTheme
 import com.xuanhan.cellularcompanion.viewmodels.MainViewModel
 
 @SuppressLint("StaticFieldLeak")
 // Note: Design flaw --> should have used state hoisting, but this isn't the biggest problem since there is only one activity.
 val bluetoothModel = BluetoothModel()
+lateinit var bluetoothService: BluetoothService
 var requiresBtPermissionCheck = false
 
 class MainActivity : ComponentActivity() {
@@ -50,7 +56,29 @@ class MainActivity : ComponentActivity() {
                 viewModel.setBluetoothEnabled(this)
             }
         }
+    private val connection = object : ServiceConnection {
+        override fun onServiceConnected(className: ComponentName, service: IBinder) {
+            val binder = service as BluetoothService.BluetoothServiceBinder
+            bluetoothService = binder.getService(bluetoothModel)
+            println("Service connected")
+        }
 
+        override fun onServiceDisconnected(arg0: ComponentName) {
+            println("Service disconnected")
+        }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        // TODO: only connect service when setup complete
+        // connectService()
+    }
+
+    internal fun connectService() {
+        Intent(this, BluetoothService::class.java).also { intent ->
+            bindService(intent, connection, Context.BIND_AUTO_CREATE)
+        }
+    }
 
     // TODO: ensure that Bluetooth is always on
     @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
@@ -115,14 +143,6 @@ class MainActivity : ComponentActivity() {
                     )
                 }
             }
-        }
-    }
-
-    override fun onWindowFocusChanged(hasFocus: Boolean) {
-        super.onWindowFocusChanged(hasFocus)
-        println("onWindowFocusChanged")
-        if (hasFocus) {
-            viewModel.setBluetoothEnabled(this)
         }
     }
 
@@ -230,5 +250,18 @@ class MainActivity : ComponentActivity() {
                 Text(text = "Bluetooth is required for Cellular Companion to connect to your Mac.")
             }
         )
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        println("onWindowFocusChanged")
+        if (hasFocus) {
+            viewModel.setBluetoothEnabled(this)
+        }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        unbindService(connection)
     }
 }

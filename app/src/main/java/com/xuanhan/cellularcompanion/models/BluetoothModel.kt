@@ -14,6 +14,7 @@ import android.bluetooth.le.ScanFilter
 import android.bluetooth.le.ScanResult
 import android.bluetooth.le.ScanSettings
 import android.content.Context
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.ParcelUuid
@@ -24,6 +25,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.xuanhan.cellularcompanion.broadcastreceivers.BondStateBroadcastReceiver
 import com.xuanhan.cellularcompanion.utilities.AES
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -45,6 +47,7 @@ class BluetoothModel {
     private lateinit var bluetoothManager: BluetoothManager
     private lateinit var context: Context
     private lateinit var bluetoothAdapter: BluetoothAdapter
+    private var bondStateBroadcastReceiver: BondStateBroadcastReceiver? = null
     private lateinit var aes: AES
     private val commandCharacteristicUUID = "00000001-0000-1000-8000-00805f9b34fb"
 
@@ -59,11 +62,14 @@ class BluetoothModel {
     private var connectionRetryCount = 0
     var isSetupComplete = false
 
-    private var isFirstInitialising = false
+    private var isFirstInitializing = false
+    private var isInitializing = false
     private var initOnConnectCallback: (() -> Unit)? = null
     private var isSharingHotspotDetails = false
     private var shareHotspotDetails2: (() -> Unit)? = null
     private var onHotspotDetailsSharedCallback: (() -> Unit)? = null
+    private var isSharingPhoneInfo = false
+    private var sharePhoneInfo2: (() -> Unit)? = null
 
     private var onScanFailedCallback: (() -> Unit)? = null
     private var onUnexpectedErrorCallback: (() -> Unit)? = null
@@ -164,7 +170,9 @@ class BluetoothModel {
                 } else {
                     // Start scan for devices if disconnected due to issues such as out of range, device powered off etc.
                     // TODO: Handle unlinking device --> don't start scan
-                    startScan()
+                    if (isSetupComplete) {
+                        startScan()
+                    }
                     println("Disconnected from device advertising: ${gatt!!.device.address}")
                 }
             } else {
@@ -181,7 +189,7 @@ class BluetoothModel {
                         println("GATT connection failed but will retry: $status")
                     } else {
                         // Run connect failed callback only during setup
-                        if (isFirstInitialising) {
+                        if (isFirstInitializing) {
                             onConnectFailedCallback?.invoke()
                         }
 
@@ -245,15 +253,43 @@ class BluetoothModel {
             super.onMtuChanged(gatt, mtu, status)
 
             if (status == BluetoothGatt.GATT_SUCCESS) {
-                if (isFirstInitialising) {
-                    // Continue next part of setup (sending Hello World command)
-                    initialize2()
+                println("MTU changed to $mtu")
+
+                if (isFirstInitializing) {
+                    // Check for Bluetooth Connect permission on Android 12+
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        if (ActivityCompat.checkSelfPermission(
+                                context,
+                                Manifest.permission.BLUETOOTH_CONNECT
+                            ) != PackageManager.PERMISSION_GRANTED
+                        ) {
+                            println("Error: The Bluetooth Connect permission has not been granted.")
+                            return
+                        }
+                    }
+
+                    // Pair with device if needed
+                    if (connectDevice!!.bondState != BluetoothDevice.BOND_BONDED) {
+                        connectDevice!!.createBond()
+
+                        // Connect broadcast receiver to receive updates
+                        bondStateBroadcastReceiver = BondStateBroadcastReceiver()
+                        val intentFilter = IntentFilter(BluetoothDevice.ACTION_BOND_STATE_CHANGED)
+                        context.registerReceiver(bondStateBroadcastReceiver, intentFilter)
+                    } else {
+                        onBonded()
+                    }
+                } else if (isInitializing) {
+                    // Indicate that initialization is complete
+                    initOnConnectCallback?.invoke()
+                    indicateOperationComplete()
                 } else if (isSharingHotspotDetails) {
                     // Share hotspot details to device
                     shareHotspotDetails2?.invoke()
+                } else if (isSharingPhoneInfo) {
+                    // Share phone info to device
+                    sharePhoneInfo2?.invoke()
                 }
-
-                println("MTU changed to $mtu")
             } else {
                 onUnexpectedErrorCallback?.invoke()
                 indicateOperationComplete()
@@ -272,25 +308,43 @@ class BluetoothModel {
                 println("Wrote to characteristic ${characteristic!!.uuid}")
 
                 // Run the next operation
-                if (isFirstInitialising) {
+                if (isFirstInitializing) {
                     initOnConnectCallback?.invoke()
-                    indicateOperationComplete()
                 } else if (isSharingHotspotDetails) {
                     onHotspotDetailsSharedCallback?.invoke()
-                    indicateOperationComplete()
                 }
+
+                indicateOperationComplete()
             } else {
                 println("Error: Failed to write to characteristic ${characteristic!!.uuid} with status $status")
 
-                if (isFirstInitialising) {
+                if (isFirstInitializing) {
                     onConnectFailedCallback?.invoke()
-                    indicateOperationComplete()
                 } else if (isSharingHotspotDetails) {
                     onHotspotDetailsShareFailedCallback?.invoke()
-                    indicateOperationComplete()
                 }
+
+                indicateOperationComplete()
             }
         }
+    }
+
+    fun onBonded() {
+        // Unregister bond state broadcast receiver if needed
+        if (bondStateBroadcastReceiver != null) {
+            context.unregisterReceiver(bondStateBroadcastReceiver)
+            bondStateBroadcastReceiver = null
+        }
+
+        // Continue next part of setup (sending Hello World command)
+        initialize2()
+    }
+
+    fun onBondingFailed() {
+        println("Error: Failed to bond to device ${connectDevice!!.address}")
+
+        // TODO: Handle bonding failure
+        indicateOperationComplete()
     }
 
     @Synchronized
@@ -307,9 +361,11 @@ class BluetoothModel {
             isRunningOperation = true
 
             // Reset indicators of commands
-            isFirstInitialising = false
+            isFirstInitializing = false
+            isInitializing = false
             initOnConnectCallback = null
             isSharingHotspotDetails = false
+            isSharingPhoneInfo = false
             onHotspotDetailsSharedCallback = null
 
             it.invoke()
@@ -354,7 +410,7 @@ class BluetoothModel {
             settings[sharedKeyKey] = sharedKey
         }
 
-        isFirstInitialising = true
+        isFirstInitializing = true
         this.initOnConnectCallback = initOnConnectCallback
         this.serviceUUID = serviceUUID.lowercase()
         this.sharedKey = sharedKey
@@ -365,7 +421,7 @@ class BluetoothModel {
      * This function initialises a Bluetooth connection with a device running the Cellular app using stored credentials.
      * @param context The context of the application that calls this function.
      * */
-    suspend fun initializeFromDataStore(context: Context) {
+    suspend fun initializeFromDataStore(initOnConnectCallback: () -> (Unit), context: Context) {
         // Retrieve service UUID and Key from DataStore
         serviceUUID = context.dataStore.data.map { settings ->
             settings[serviceUUIDKey] ?: ""
@@ -387,6 +443,8 @@ class BluetoothModel {
             return
         }
 
+        isInitializing = true
+        this.initOnConnectCallback = initOnConnectCallback
         initialize(context)
     }
 
@@ -434,7 +492,7 @@ class BluetoothModel {
         val filter =
             ScanFilter.Builder().setServiceUuid(ParcelUuid.fromString(serviceUUID)).build()
         val scanSettings = ScanSettings.Builder().apply {
-            if (isFirstInitialising) {
+            if (isFirstInitializing) {
                 setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
             } else {
                 setScanMode(ScanSettings.SCAN_MODE_LOW_POWER)
@@ -577,6 +635,54 @@ class BluetoothModel {
     suspend fun markSetupComplete() {
         context.dataStore.edit { settings ->
             settings[isSetupCompleteKey] = true
+        }
+    }
+
+    fun sharePhoneInfo(signalLevel: Int, networkType: String, batteryPercentage: Int) {
+        if (gatt == null) {
+            println("Error: Device is unavailable.")
+            return
+        }
+        if (commandCharacteristic == null) {
+            println("Error: Command characteristic is unavailable")
+            return
+        }
+
+        // Check for Bluetooth Connect permission on Android 12+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (ActivityCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.BLUETOOTH_CONNECT
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                println("Error: The Bluetooth Connect permission has not been granted.")
+                return
+            }
+        }
+
+        // Enqueue operation to share hotspot details
+        enqueueOperation {
+            startSharePhoneInfo(signalLevel, networkType, batteryPercentage)
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun startSharePhoneInfo(signalLevel: Int, networkType: String, batteryPercentage: Int) {
+        isSharingPhoneInfo = true
+
+        sharePhoneInfo2 = {
+            commandCharacteristic!!.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+            commandCharacteristic!!.value =
+                "2 $signalLevel $networkType $batteryPercentage".toByteArray()
+            gatt!!.writeCharacteristic(commandCharacteristic!!)
+        }
+
+        if (bluetoothManager.getConnectedDevices(BluetoothProfile.GATT)
+                .find { it.address == connectDevice?.address } == null
+        ) {
+            startScan()
+        } else {
+            sharePhoneInfo2!!.invoke()
         }
     }
 

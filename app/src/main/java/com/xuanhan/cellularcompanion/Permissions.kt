@@ -68,6 +68,16 @@ fun Permissions(navigator: DestinationsNavigator) {
                     rememberPermissionState(permission = Manifest.permission.ACCESS_FINE_LOCATION)
                 )
             )
+
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+                add(
+                    PermissionViewModel(
+                        "Managing phone state",
+                        "Required to get information on your phone's cellular connection.",
+                        rememberPermissionState(permission = Manifest.permission.READ_PHONE_STATE)
+                    )
+                )
+            }
         }
         add(
             PermissionViewModel(

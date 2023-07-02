@@ -30,7 +30,7 @@ import kotlinx.coroutines.launch
 @Destination
 fun SettingUp2(navigator: DestinationsNavigator, ssid: String, password: String) {
     val currentContext = LocalContext.current
-    val viewModel = remember { SettingUpViewModel(currentContext.applicationContext) }
+    val viewModel = remember { SettingUpViewModel(currentContext) }
     val coroutineScope = rememberCoroutineScope()
 
     LaunchedEffect(keys = arrayOf(ssid, password)) {
