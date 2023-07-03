@@ -75,7 +75,7 @@ class BluetoothService : Service() {
     private fun handleSignalStrengthLevelChanged(signalStrengthLevel: Int) {
         if (signalStrengthLevel != prevSignalStrengthLevel) {
             println("Level $signalStrengthLevel")
-            bluetoothModel.sharePhoneInfo(signalStrengthLevel, "", -1)
+            bluetoothModel.sharePhoneInfo(signalStrengthLevel, "-1", -1)
         }
         prevSignalStrengthLevel = signalStrengthLevel
     }
@@ -118,7 +118,7 @@ class BluetoothService : Service() {
     private fun handleBatteryPercentageChanged(batteryPercentage: Int) {
         if (batteryPercentage != prevBatteryPercentage && (batteryPercentage - 5) % 10 == 0) {
             println("Updating battery level $batteryPercentage")
-            bluetoothModel.sharePhoneInfo(-1, "", batteryPercentage)
+            bluetoothModel.sharePhoneInfo(-1, "-1", batteryPercentage)
         }
 
         prevBatteryPercentage = batteryPercentage
