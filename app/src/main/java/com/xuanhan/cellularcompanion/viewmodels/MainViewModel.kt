@@ -20,6 +20,9 @@ class MainViewModel {
     private val _isShowingConnectFailedDialog = MutableStateFlow(false)
     val isShowingConnectFailedDialog: StateFlow<Boolean> =
         _isShowingConnectFailedDialog.asStateFlow()
+    val _isShowingBondFailedDialog = MutableStateFlow(false)
+    val isShowingBondFailedDialog: StateFlow<Boolean> =
+        _isShowingBondFailedDialog.asStateFlow()
     private val _isBluetoothEnabled = MutableStateFlow(true)
     val isBluetoothEnabled: StateFlow<Boolean> =
         _isBluetoothEnabled.asStateFlow()
@@ -28,8 +31,9 @@ class MainViewModel {
         bluetoothModel.registerForErrorHandling(
             ::showScanFailedDialog,
             ::showUnexpectedErrorDialog,
+            ::showConnectFailedDialog,
+            ::showBondFailedDialog,
             ::showHotspotDetailsShareFailedDialog,
-            ::showConnectFailedDialog
         )
     }
 
@@ -66,6 +70,15 @@ class MainViewModel {
 
     fun confirmConnectFailedDialog() {
         _isShowingConnectFailedDialog.value = false
+        bluetoothModel.onErrorDismissedCallback()
+    }
+
+    private fun showBondFailedDialog() {
+        _isShowingBondFailedDialog.value = true
+    }
+
+    fun confirmBondFailedDialog() {
+        _isShowingBondFailedDialog.value = false
         bluetoothModel.onErrorDismissedCallback()
     }
 

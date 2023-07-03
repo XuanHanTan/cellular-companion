@@ -47,7 +47,6 @@ class BluetoothModel {
     private lateinit var bluetoothManager: BluetoothManager
     private lateinit var context: Context
     private lateinit var bluetoothAdapter: BluetoothAdapter
-    private var bondStateBroadcastReceiver: BondStateBroadcastReceiver? = null
     private lateinit var aes: AES
     private val commandCharacteristicUUID = "00000001-0000-1000-8000-00805f9b34fb"
 
@@ -61,6 +60,8 @@ class BluetoothModel {
     private var isDisconnecting = false
     private var connectionRetryCount = 0
     var isSetupComplete = false
+    val isInitialized: Boolean
+        get() = connectDevice != null && gatt != null && commandCharacteristic != null
 
     private var isFirstInitializing = false
     private var isInitializing = false
@@ -74,6 +75,7 @@ class BluetoothModel {
     private var onScanFailedCallback: (() -> Unit)? = null
     private var onUnexpectedErrorCallback: (() -> Unit)? = null
     private var onConnectFailedCallback: (() -> Unit)? = null
+    private var onBondFailedCallback: (() -> Unit)? = null
     private var onHotspotDetailsShareFailedCallback: (() -> Unit)? = null
     val onErrorDismissedCallback = {
         reset()
@@ -169,7 +171,6 @@ class BluetoothModel {
                     gatt.discoverServices()
                 } else {
                     // Start scan for devices if disconnected due to issues such as out of range, device powered off etc.
-                    // TODO: Handle unlinking device --> don't start scan
                     if (isSetupComplete) {
                         startScan()
                     }
@@ -273,9 +274,8 @@ class BluetoothModel {
                         connectDevice!!.createBond()
 
                         // Connect broadcast receiver to receive updates
-                        bondStateBroadcastReceiver = BondStateBroadcastReceiver()
                         val intentFilter = IntentFilter(BluetoothDevice.ACTION_BOND_STATE_CHANGED)
-                        context.registerReceiver(bondStateBroadcastReceiver, intentFilter)
+                        context.registerReceiver(BondStateBroadcastReceiver(), intentFilter)
                     } else {
                         onBonded()
                     }
@@ -330,12 +330,6 @@ class BluetoothModel {
     }
 
     fun onBonded() {
-        // Unregister bond state broadcast receiver if needed
-        if (bondStateBroadcastReceiver != null) {
-            context.unregisterReceiver(bondStateBroadcastReceiver)
-            bondStateBroadcastReceiver = null
-        }
-
         // Continue next part of setup (sending Hello World command)
         initialize2()
     }
@@ -343,7 +337,7 @@ class BluetoothModel {
     fun onBondingFailed() {
         println("Error: Failed to bond to device ${connectDevice!!.address}")
 
-        // TODO: Handle bonding failure
+        onBondFailedCallback?.invoke()
         indicateOperationComplete()
     }
 
@@ -696,13 +690,15 @@ class BluetoothModel {
     fun registerForErrorHandling(
         onScanFailedCallback: () -> Unit,
         onUnexpectedErrorCallback: () -> Unit,
+        onConnectFailedCallback: () -> Unit,
+        onBondFailedCallback: () -> Unit,
         onHotspotDetailsShareFailedCallback: () -> Unit,
-        onConnectFailedCallback: () -> Unit
     ) {
         this.onScanFailedCallback = onScanFailedCallback
         this.onUnexpectedErrorCallback = onUnexpectedErrorCallback
-        this.onHotspotDetailsShareFailedCallback = onHotspotDetailsShareFailedCallback
         this.onConnectFailedCallback = onConnectFailedCallback
+        this.onBondFailedCallback = onBondFailedCallback
+        this.onHotspotDetailsShareFailedCallback = onHotspotDetailsShareFailedCallback
     }
 
     /**

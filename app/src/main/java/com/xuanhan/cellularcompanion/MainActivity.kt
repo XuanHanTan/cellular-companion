@@ -48,6 +48,7 @@ val bluetoothModel = BluetoothModel()
 lateinit var bluetoothService: BluetoothService
 var requiresBtPermissionCheck = false
 
+// TODO: handle missing permissions
 class MainActivity : ComponentActivity() {
     private val viewModel = MainViewModel()
     private val enableBt =
@@ -80,7 +81,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // TODO: ensure that Bluetooth is always on
     @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
     @OptIn(
         ExperimentalMaterialNavigationApi::class, ExperimentalAnimationApi::class,
@@ -117,6 +117,7 @@ class MainActivity : ComponentActivity() {
                     val showUnexpectedErrorDialogState: Boolean by viewModel.isShowingUnexpectedErrorDialog.collectAsState()
                     val showHotspotDetailsShareFailedDialogState: Boolean by viewModel.isShowingHotspotDetailsShareFailedDialog.collectAsState()
                     val showConnectFailedDialogState: Boolean by viewModel.isShowingConnectFailedDialog.collectAsState()
+                    val showBondFailedDialogState: Boolean by viewModel.isShowingBondFailedDialog.collectAsState()
                     val isBluetoothEnabled: Boolean by viewModel.isBluetoothEnabled.collectAsState()
 
                     if (showScanFailedDialogState)
@@ -127,6 +128,8 @@ class MainActivity : ComponentActivity() {
                         HotspotDetailsShareFailedDialog()
                     if (showConnectFailedDialogState)
                         ConnectFailedDialog()
+                    if (showBondFailedDialogState)
+                        BondFailedDialog()
                     if (!isBluetoothEnabled)
                         EnableBluetoothDialog()
 
@@ -223,6 +226,27 @@ class MainActivity : ComponentActivity() {
             dismissButton = {},
             title = {
                 Text(text = "Failed to connect")
+            },
+            text = {
+                Text(text = "Ensure that your Mac remains close to this device and try again.")
+            }
+        )
+    }
+
+    @Composable
+    fun BondFailedDialog() {
+        AlertDialog(
+            onDismissRequest = {},
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.confirmBondFailedDialog()
+                }) {
+                    Text(text = "Retry")
+                }
+            },
+            dismissButton = {},
+            title = {
+                Text(text = "Failed to pair")
             },
             text = {
                 Text(text = "Ensure that your Mac remains close to this device and try again.")

@@ -17,6 +17,7 @@ class BondStateBroadcastReceiver: BroadcastReceiver() {
             BluetoothDevice.BOND_BONDED -> {
                 println("BondStateBroadcastReceiver: Bonded")
                 bluetoothModel.onBonded()
+                p0!!.unregisterReceiver(this)
             }
             BluetoothDevice.BOND_BONDING -> {
                 println("BondStateBroadcastReceiver: Bonding")
@@ -24,6 +25,7 @@ class BondStateBroadcastReceiver: BroadcastReceiver() {
             BluetoothDevice.BOND_NONE -> {
                 println("BondStateBroadcastReceiver: Not bonded")
                 bluetoothModel.onBondingFailed()
+                p0!!.unregisterReceiver(this)
             }
             else -> {
                 println("BondStateBroadcastReceiver: Unknown bond state")

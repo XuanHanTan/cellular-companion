@@ -42,6 +42,7 @@ fun Start(navigator: DestinationsNavigator) {
         if (bluetoothModel.isSetupComplete) {
             val homePageViewModel = HomePageViewModel()
             requiresBtPermissionCheck = true
+            homePageViewModel.prepareBluetooth(context)
             coroutineScope.launch(context = Dispatchers.Main.immediate) {
                 navigator.navigate(HomePageDestination(homePageViewModel)) {
                     popUpTo(StartDestination.route) { inclusive = true }

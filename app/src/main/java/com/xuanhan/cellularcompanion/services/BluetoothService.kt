@@ -23,9 +23,6 @@ import androidx.annotation.RequiresApi
 import androidx.core.app.ActivityCompat
 import com.xuanhan.cellularcompanion.MainActivity
 import com.xuanhan.cellularcompanion.models.BluetoothModel
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import java.util.Timer
 import java.util.TimerTask
 
@@ -133,13 +130,13 @@ class BluetoothService : Service() {
      */
     inner class BluetoothServiceBinder : Binder() {
         fun getService(bluetoothModel: BluetoothModel): BluetoothService {
+            if (!bluetoothModel.isInitialized) {
+                throw IllegalStateException("BluetoothModel must be initialized before binding to service.")
+            }
+
             this@BluetoothService.bluetoothModel = bluetoothModel
 
-            CoroutineScope(Dispatchers.IO).launch {
-                bluetoothModel.initializeFromDataStore({
-                    startSharePhoneInfo()
-                }, applicationContext)
-            }
+            startSharePhoneInfo()
 
             return this@BluetoothService
         }
