@@ -25,12 +25,13 @@ import com.xuanhan.cellularcompanion.MainActivity
 import com.xuanhan.cellularcompanion.models.BluetoothModel
 import java.util.Timer
 import java.util.TimerTask
+import kotlin.math.floor
 
 class BluetoothService : Service() {
     private val binder = BluetoothServiceBinder()
     private lateinit var bluetoothModel: BluetoothModel
     private val batteryLevelTimer = Timer()
-    private var prevSignalStrengthLevel = -1
+    private var prevModifiedSignalStrengthLevel = -1
     private var prevNetworkType = ""
     private var prevBatteryPercentage = -1
     private val telephonyCallback = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
@@ -73,19 +74,22 @@ class BluetoothService : Service() {
         }
 
     private fun handleSignalStrengthLevelChanged(signalStrengthLevel: Int) {
-        if (signalStrengthLevel != prevSignalStrengthLevel) {
-            println("Level $signalStrengthLevel")
-            bluetoothModel.sharePhoneInfo(signalStrengthLevel, "-1", -1)
+        val modifiedSignalStrengthLevel = floor(((signalStrengthLevel + 1) / 5 * 4).toDouble() + 0.5).toInt() - 1
+        if (modifiedSignalStrengthLevel != prevModifiedSignalStrengthLevel) {
+            println("Modified level $modifiedSignalStrengthLevel")
+
+            bluetoothModel.sharePhoneInfo(modifiedSignalStrengthLevel, "-1", -1)
         }
-        prevSignalStrengthLevel = signalStrengthLevel
+        prevModifiedSignalStrengthLevel = modifiedSignalStrengthLevel
     }
 
     private fun handleNetworkTypeChanged(networkType: Int) {
         val networkTypeString = when (networkType) {
             TelephonyManager.NETWORK_TYPE_GPRS,
+            TelephonyManager.NETWORK_TYPE_1xRTT -> "GPRS"
+
             TelephonyManager.NETWORK_TYPE_EDGE,
             TelephonyManager.NETWORK_TYPE_CDMA,
-            TelephonyManager.NETWORK_TYPE_1xRTT,
             TelephonyManager.NETWORK_TYPE_IDEN,
             TelephonyManager.NETWORK_TYPE_GSM -> "E"
 
@@ -116,9 +120,10 @@ class BluetoothService : Service() {
     }
 
     private fun handleBatteryPercentageChanged(batteryPercentage: Int) {
-        if (batteryPercentage != prevBatteryPercentage && (batteryPercentage - 5) % 10 == 0) {
-            println("Updating battery level $batteryPercentage")
-            bluetoothModel.sharePhoneInfo(-1, "-1", batteryPercentage)
+        if (batteryPercentage != prevBatteryPercentage && ((batteryPercentage + 12) % 25 == 0 || prevBatteryPercentage == -1)) {
+            val roundedPercentage = Math.floorDiv(batteryPercentage + 12, 25) * 25
+            println("Updating battery level $roundedPercentage")
+            bluetoothModel.sharePhoneInfo(-1, "-1", roundedPercentage)
         }
 
         prevBatteryPercentage = batteryPercentage
@@ -205,6 +210,7 @@ class BluetoothService : Service() {
 
     override fun onUnbind(intent: Intent?): Boolean {
         batteryLevelTimer.cancel()
+        // TODO: dispose telephony listeners
         return super.onUnbind(intent)
     }
 }
