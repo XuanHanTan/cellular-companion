@@ -121,13 +121,11 @@ class BluetoothModel {
             when (errorCode) {
                 SCAN_FAILED_APPLICATION_REGISTRATION_FAILED -> {
                     onScanFailedCallback?.invoke()
-                    indicateOperationComplete()
                     println("Scan failed: restart Bluetooth and press Retry")
                 }
 
                 else -> {
                     onScanFailedCallback?.invoke()
-                    indicateOperationComplete()
                     println("Scan failed with error code $errorCode")
                 }
             }
@@ -240,12 +238,10 @@ class BluetoothModel {
                     gatt.requestMtu(517)
                 } else {
                     onUnexpectedErrorCallback?.invoke()
-                    indicateOperationComplete()
                     println("Could not find service.")
                 }
             } else {
                 onUnexpectedErrorCallback?.invoke()
-                indicateOperationComplete()
                 println("Service discovery failed due to internal error: $status")
             }
         }
@@ -292,7 +288,6 @@ class BluetoothModel {
                 }
             } else {
                 onUnexpectedErrorCallback?.invoke()
-                indicateOperationComplete()
                 println("Error: MTU change failed with status $status")
             }
         }
@@ -322,9 +317,9 @@ class BluetoothModel {
                     onConnectFailedCallback?.invoke()
                 } else if (isSharingHotspotDetails) {
                     onHotspotDetailsShareFailedCallback?.invoke()
+                } else {
+                    indicateOperationComplete()
                 }
-
-                indicateOperationComplete()
             }
         }
     }
@@ -338,7 +333,6 @@ class BluetoothModel {
         println("Error: Failed to bond to device ${connectDevice!!.address}")
 
         onBondFailedCallback?.invoke()
-        indicateOperationComplete()
     }
 
     @Synchronized

@@ -60,7 +60,7 @@ fun HomePage(navigator: DestinationsNavigator, homePageViewModel: HomePageViewMo
                         .border(
                             4.dp,
                             if (isSystemInDarkTheme())
-                                Color(0xFF395833).copy(alpha = if (isPressed) 0.8f else 1f)
+                                Color(0xFF5C8C54).copy(alpha = if (isPressed) 0.8f else 1f)
                             else
                                 Color(0xFF8FD684).copy(alpha = if (isPressed) 0.8f else 1f),
                             shape = CircleShape
@@ -72,7 +72,11 @@ fun HomePage(navigator: DestinationsNavigator, homePageViewModel: HomePageViewMo
                             Color(0xFF292F28).copy(alpha = if (isPressed) 0.8f else 1f)
                         else
                             Color(0xFFDCF4D6).copy(alpha = if (isPressed) 0.8f else 1f),
-                        contentColor = Color(0xFF1C850B)
+                        contentColor =
+                        if (isSystemInDarkTheme())
+                            Color(0xFF35D11B).copy(alpha = if (isPressed) 0.8f else 1f)
+                        else
+                            Color(0xFF1C850B).copy(alpha = if (isPressed) 0.8f else 1f),
                     ),
                     interactionSource = interactionSource,
                     ) {
