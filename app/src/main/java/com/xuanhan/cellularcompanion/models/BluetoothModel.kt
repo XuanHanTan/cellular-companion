@@ -7,6 +7,7 @@ import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothGatt
 import android.bluetooth.BluetoothGattCallback
 import android.bluetooth.BluetoothGattCharacteristic
+import android.bluetooth.BluetoothGattDescriptor
 import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothProfile
 import android.bluetooth.le.ScanCallback
@@ -29,6 +30,7 @@ import com.xuanhan.cellularcompanion.broadcastreceivers.BondStateBroadcastReceiv
 import com.xuanhan.cellularcompanion.utilities.AES
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import java.util.UUID
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.regex.Pattern
 
@@ -49,19 +51,21 @@ class BluetoothModel {
     private lateinit var bluetoothAdapter: BluetoothAdapter
     private lateinit var aes: AES
     private val commandCharacteristicUUID = "00000001-0000-1000-8000-00805f9b34fb"
+    private val notificationCharacteristicUUID = "00000002-0000-1000-8000-00805f9b34fb"
 
     private var serviceUUID: String? = null
     private var sharedKey: String? = null
     private var connectDevice: BluetoothDevice? = null
     private var gatt: BluetoothGatt? = null
     private var commandCharacteristic: BluetoothGattCharacteristic? = null
+    private var notificationCharacteristic: BluetoothGattCharacteristic? = null
     private var isScanning = false
     private var isConnecting = false
     private var isDisconnecting = false
     private var connectionRetryCount = 0
     var isSetupComplete = false
     val isInitialized: Boolean
-        get() = connectDevice != null && gatt != null && commandCharacteristic != null
+        get() = connectDevice != null && gatt != null && commandCharacteristic != null && notificationCharacteristic != null
 
     private var isFirstInitializing = false
     private var isInitializing = false
@@ -89,30 +93,32 @@ class BluetoothModel {
         override fun onScanResult(callbackType: Int, result: ScanResult) {
             super.onScanResult(callbackType, result)
 
-            with(result.device) {
-                // Check for Bluetooth Connect permission on Android 12+
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    if (ActivityCompat.checkSelfPermission(
-                            context,
-                            Manifest.permission.BLUETOOTH_CONNECT
-                        ) != PackageManager.PERMISSION_GRANTED
-                    ) {
-                        println("Error: The Bluetooth Connect permission has not been granted.")
-                        return
+            if (isScanning) {
+                with(result.device) {
+                    // Check for Bluetooth Connect permission on Android 12+
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        if (ActivityCompat.checkSelfPermission(
+                                context,
+                                Manifest.permission.BLUETOOTH_CONNECT
+                            ) != PackageManager.PERMISSION_GRANTED
+                        ) {
+                            println("Error: The Bluetooth Connect permission has not been granted.")
+                            return
+                        }
                     }
+
+                    // Stop scan
+                    stopScan()
+                    isScanning = false
+
+                    println("Found Bluetooth device: ${result.scanRecord?.serviceUuids} $name $address")
+                    println("Now attempting to connect to Bluetooth device.")
+
+                    // Connect to the device
+                    isConnecting = true
+                    connectDevice = this
+                    connectGatt(context, false, gattCallback, BluetoothDevice.TRANSPORT_LE)
                 }
-
-                // Stop scan
-                stopScan()
-                isScanning = false
-
-                println("Found Bluetooth device: ${result.scanRecord?.serviceUuids} $name $address")
-                println("Now attempting to connect to Bluetooth device.")
-
-                // Connect to the device
-                isConnecting = true
-                connectDevice = this
-                connectGatt(context, false, gattCallback, BluetoothDevice.TRANSPORT_LE)
             }
         }
 
@@ -231,8 +237,9 @@ class BluetoothModel {
 
                     println("Found Cellular service!")
 
-                    // Store the reference to the command characteristic for the Cellular service
+                    // Store the reference to the characteristics for the Cellular service
                     commandCharacteristic = getCharacteristicForDevice(commandCharacteristicUUID)
+                    notificationCharacteristic = getCharacteristicForDevice(notificationCharacteristicUUID)
 
                     // Request for a larger maximum transmission unit (MTU) size
                     gatt.requestMtu(517)
@@ -276,9 +283,8 @@ class BluetoothModel {
                         onBonded()
                     }
                 } else if (isInitializing) {
-                    // Indicate that initialization is complete
-                    initOnConnectCallback?.invoke()
-                    indicateOperationComplete()
+                    // Subscribe to notifications on the command characteristic
+                    enableNotifications()
                 } else if (isSharingHotspotDetails) {
                     // Share hotspot details to device
                     shareHotspotDetails2?.invoke()
@@ -289,6 +295,33 @@ class BluetoothModel {
             } else {
                 onUnexpectedErrorCallback?.invoke()
                 println("Error: MTU change failed with status $status")
+            }
+        }
+
+        override fun onDescriptorWrite(
+            gatt: BluetoothGatt?,
+            descriptor: BluetoothGattDescriptor?,
+            status: Int
+        ) {
+            super.onDescriptorWrite(gatt, descriptor, status)
+
+            if (status == BluetoothGatt.GATT_SUCCESS) {
+                println("Write to descriptor of characteristic ${descriptor!!.characteristic.uuid}")
+
+                if (isInitializing) {
+                    // Indicate that initialization is complete
+                    initOnConnectCallback?.invoke()
+                    indicateOperationComplete()
+                }
+
+                // TODO: Indicate that device is connected
+            } else {
+                println("Error: Failed to write to descriptor of characteristic ${descriptor!!.characteristic.uuid} with status $status")
+                if (!isDisconnecting) {
+                    // TODO: Indicate that device is not connected
+                }
+
+                // TODO: show error dialog
             }
         }
 
@@ -319,6 +352,34 @@ class BluetoothModel {
                     onHotspotDetailsShareFailedCallback?.invoke()
                 } else {
                     indicateOperationComplete()
+                }
+            }
+        }
+
+        override fun onCharacteristicChanged(
+            gatt: BluetoothGatt?,
+            characteristic: BluetoothGattCharacteristic?
+        ) {
+            super.onCharacteristicChanged(gatt, characteristic)
+
+            if (characteristic != null) {
+                val text = String(characteristic.value)
+                println("Received data from characteristic ${characteristic.uuid}: $text")
+
+                when (text) {
+                    "0" -> {
+                        println("Enabling hotspot...")
+
+                    }
+
+                    "1" -> {
+                        println("Disabling hotspot...")
+
+                    }
+
+                    else -> {
+                        println("Error: Received unknown payload from characteristic.")
+                    }
                 }
             }
         }
@@ -551,6 +612,39 @@ class BluetoothModel {
         }
     }
 
+    private fun enableNotifications() {
+        if (gatt == null) {
+            println("Error: Device is unavailable.")
+            return
+        }
+        if (notificationCharacteristic == null) {
+            println("Error: Notification characteristic is unavailable.")
+            return
+        }
+
+        // Check for Bluetooth Connect permission on Android 12+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (ActivityCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.BLUETOOTH_CONNECT
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                println("Error: The Bluetooth Connect permission has not been granted.")
+                return
+            }
+        }
+
+        val cccdUuid = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
+        val descriptor = notificationCharacteristic!!.getDescriptor(cccdUuid)
+        gatt!!.setCharacteristicNotification(notificationCharacteristic!!, true)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            gatt!!.writeDescriptor(descriptor, BluetoothGattDescriptor.ENABLE_INDICATION_VALUE)
+        } else {
+            descriptor.value = BluetoothGattDescriptor.ENABLE_INDICATION_VALUE
+            gatt!!.writeDescriptor(descriptor)
+        }
+    }
+
     /**
      * This function shares the hotspot details with the device running the Cellular app. This is a public function to enqueue this operation.
      * @param ssid The SSID of the hotspot to connect to.
@@ -704,6 +798,7 @@ class BluetoothModel {
         connectDevice = null
         gatt = null
         commandCharacteristic = null
+        notificationCharacteristic = null
         isScanning = false
         isConnecting = false
         isDisconnecting = false
