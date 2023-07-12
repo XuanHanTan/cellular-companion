@@ -32,21 +32,31 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import com.google.accompanist.navigation.material.ExperimentalMaterialNavigationApi
 import com.ramcosta.composedestinations.DestinationsNavHost
 import com.ramcosta.composedestinations.animations.defaults.RootNavGraphDefaultAnimations
 import com.ramcosta.composedestinations.animations.rememberAnimatedNavHostEngine
 import com.xuanhan.cellularcompanion.destinations.StartDestination
 import com.xuanhan.cellularcompanion.models.BluetoothModel
+import com.xuanhan.cellularcompanion.models.dataStore
 import com.xuanhan.cellularcompanion.services.BluetoothService
 import com.xuanhan.cellularcompanion.ui.theme.AppTheme
 import com.xuanhan.cellularcompanion.viewmodels.MainViewModel
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
+import kotlin.properties.Delegates
 
 @SuppressLint("StaticFieldLeak")
 // Note: Design flaw --> should have used state hoisting, but this isn't the biggest problem since there is only one activity.
 val bluetoothModel = BluetoothModel()
 lateinit var bluetoothService: BluetoothService
 var requiresBtPermissionCheck = false
+val isSetupCompleteKey = booleanPreferencesKey("isSetupComplete")
+var isSetupComplete by Delegates.notNull<Boolean>()
 
 // TODO: handle missing permissions
 class MainActivity : ComponentActivity() {
@@ -71,8 +81,15 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
-        // TODO: only connect service when setup complete
-        // connectService()
+
+        CoroutineScope(Dispatchers.Main.immediate).launch {
+            isSetupComplete = this@MainActivity.dataStore.data.map { settings ->
+                settings[isSetupCompleteKey] ?: false
+            }.first()
+            if (isSetupComplete) {
+                connectService()
+            }
+        }
     }
 
     internal fun connectService() {

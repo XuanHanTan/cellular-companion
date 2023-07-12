@@ -1,17 +1,23 @@
 package com.xuanhan.cellularcompanion.viewmodels
 
-import android.content.Context
-import android.os.Parcelable
-import com.xuanhan.cellularcompanion.MainActivity
 import com.xuanhan.cellularcompanion.bluetoothModel
-import kotlinx.parcelize.Parcelize
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
-@Parcelize
-class HomePageViewModel: Parcelable {
-    suspend fun prepareBluetooth(context: Context) {
-        bluetoothModel.initializeFromDataStore({
-            val mainActivity = context.findActivity() as MainActivity
-            mainActivity.connectService()
-        }, context.applicationContext)
+class HomePageViewModel {
+    private val _hotspotStatusMessage = MutableStateFlow("Disconnected")
+    val hotspotStatusMessage: StateFlow<String> = _hotspotStatusMessage.asStateFlow()
+
+    init {
+        bluetoothModel.registerForUIChanges(onConnectStatusUpdate = ::onConnectStatusUpdate)
+    }
+
+    private fun onConnectStatusUpdate(isConnected: Boolean) {
+        if (isConnected) {
+            _hotspotStatusMessage.value = "Idle"
+        } else {
+            _hotspotStatusMessage.value = "Disconnected"
+        }
     }
 }

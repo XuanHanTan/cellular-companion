@@ -22,6 +22,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -38,9 +39,12 @@ import com.xuanhan.cellularcompanion.viewmodels.HomePageViewModel
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
 @Destination
-fun HomePage(navigator: DestinationsNavigator, homePageViewModel: HomePageViewModel) {
+fun HomePage(navigator: DestinationsNavigator) {
     val interactionSource = remember { MutableInteractionSource() }
+    val viewModel = HomePageViewModel()
+
     val isPressed by interactionSource.collectIsPressedAsState()
+    val hotspotStatusMessage: String by viewModel.hotspotStatusMessage.collectAsState()
 
     Scaffold {
         Column(
@@ -50,7 +54,7 @@ fun HomePage(navigator: DestinationsNavigator, homePageViewModel: HomePageViewMo
                 .padding(0.dp, 32.dp, 0.dp, 48.dp)
                 .fillMaxWidth()
         ) {
-            Text("Connected to \"\"")
+            Text(hotspotStatusMessage)
             Spacer(modifier = Modifier.weight(1f))
             CompositionLocalProvider(LocalRippleTheme provides NoRippleTheme) {
                 IconButton(

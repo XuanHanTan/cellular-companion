@@ -22,11 +22,12 @@ import android.os.ParcelUuid
 import androidx.core.app.ActivityCompat
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.xuanhan.cellularcompanion.broadcastreceivers.BondStateBroadcastReceiver
+import com.xuanhan.cellularcompanion.isSetupComplete
+import com.xuanhan.cellularcompanion.isSetupCompleteKey
 import com.xuanhan.cellularcompanion.utilities.AES
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -44,7 +45,6 @@ class BluetoothModel {
     private var isRunningOperation = false
     private val serviceUUIDKey = stringPreferencesKey("serviceUUID")
     private val sharedKeyKey = stringPreferencesKey("sharedKey")
-    val isSetupCompleteKey = booleanPreferencesKey("isSetupComplete")
 
     private lateinit var bluetoothManager: BluetoothManager
     private lateinit var context: Context
@@ -63,7 +63,6 @@ class BluetoothModel {
     private var isConnecting = false
     private var isDisconnecting = false
     private var connectionRetryCount = 0
-    var isSetupComplete = false
     val isInitialized: Boolean
         get() = connectDevice != null && gatt != null && commandCharacteristic != null && notificationCharacteristic != null
 
@@ -85,6 +84,8 @@ class BluetoothModel {
         reset()
         initialize(context)
     }
+
+    private var onConnectStatusUpdate: ((isConnected: Boolean) -> Unit)? = null
 
     /**
      * This callback handles results during BLE scans.
@@ -239,7 +240,8 @@ class BluetoothModel {
 
                     // Store the reference to the characteristics for the Cellular service
                     commandCharacteristic = getCharacteristicForDevice(commandCharacteristicUUID)
-                    notificationCharacteristic = getCharacteristicForDevice(notificationCharacteristicUUID)
+                    notificationCharacteristic =
+                        getCharacteristicForDevice(notificationCharacteristicUUID)
 
                     // Request for a larger maximum transmission unit (MTU) size
                     gatt.requestMtu(517)
@@ -314,14 +316,13 @@ class BluetoothModel {
                     indicateOperationComplete()
                 }
 
-                // TODO: Indicate that device is connected
+                // Indicate that device is connected
+                onConnectStatusUpdate?.invoke(true)
             } else {
                 println("Error: Failed to write to descriptor of characteristic ${descriptor!!.characteristic.uuid} with status $status")
                 if (!isDisconnecting) {
-                    // TODO: Indicate that device is not connected
+                    onConnectStatusUpdate?.invoke(false)
                 }
-
-                // TODO: show error dialog
             }
         }
 
@@ -787,6 +788,12 @@ class BluetoothModel {
         this.onConnectFailedCallback = onConnectFailedCallback
         this.onBondFailedCallback = onBondFailedCallback
         this.onHotspotDetailsShareFailedCallback = onHotspotDetailsShareFailedCallback
+    }
+
+    fun registerForUIChanges(
+        onConnectStatusUpdate: (isConnected: Boolean) -> Unit
+    ) {
+        this.onConnectStatusUpdate = onConnectStatusUpdate
     }
 
     /**

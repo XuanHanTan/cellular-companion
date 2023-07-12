@@ -23,6 +23,9 @@ import androidx.annotation.RequiresApi
 import androidx.core.app.ActivityCompat
 import com.xuanhan.cellularcompanion.MainActivity
 import com.xuanhan.cellularcompanion.models.BluetoothModel
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import java.util.Timer
 import java.util.TimerTask
 import kotlin.math.floor
@@ -34,6 +37,7 @@ class BluetoothService : Service() {
     private var prevModifiedSignalStrengthLevel = -1
     private var prevNetworkType = ""
     private var prevBatteryPercentage = -1
+    private lateinit var telephonyManager: TelephonyManager
     private val telephonyCallback = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
         object : TelephonyCallback(), TelephonyCallback.SignalStrengthsListener,
             TelephonyCallback.DisplayInfoListener {
@@ -60,8 +64,6 @@ class BluetoothService : Service() {
                         return
                     }
 
-                    val telephonyManager =
-                        getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
                     val networkType = telephonyManager.networkType
                     handleNetworkTypeChanged(networkType)
                 }
@@ -74,7 +76,8 @@ class BluetoothService : Service() {
         }
 
     private fun handleSignalStrengthLevelChanged(signalStrengthLevel: Int) {
-        val modifiedSignalStrengthLevel = floor(((signalStrengthLevel + 1) / 5 * 4).toDouble() + 0.5).toInt() - 1
+        val modifiedSignalStrengthLevel =
+            floor(((signalStrengthLevel + 1) / 5 * 4).toDouble() + 0.5).toInt() - 1
         if (modifiedSignalStrengthLevel != prevModifiedSignalStrengthLevel) {
             println("Modified level $modifiedSignalStrengthLevel")
 
@@ -134,20 +137,32 @@ class BluetoothService : Service() {
      * runs in the same process as its clients, we don't need to deal with IPC.
      */
     inner class BluetoothServiceBinder : Binder() {
-        fun getService(bluetoothModel: BluetoothModel): BluetoothService {
-            if (!bluetoothModel.isInitialized) {
-                throw IllegalStateException("BluetoothModel must be initialized before binding to service.")
-            }
-
+        fun getService(
+            bluetoothModel: BluetoothModel
+        ): BluetoothService {
             this@BluetoothService.bluetoothModel = bluetoothModel
 
-            startSharePhoneInfo()
+            if (!bluetoothModel.isInitialized) {
+                CoroutineScope(Dispatchers.IO).launch {
+                    println("Initialising Bluetooth model now...")
+                    bluetoothModel.initializeFromDataStore(
+                        {
+                            startSharePhoneInfo()
+                        }, applicationContext
+                    )
+                }
+            } else {
+                startSharePhoneInfo()
+            }
 
             return this@BluetoothService
         }
     }
 
     override fun onBind(intent: Intent): IBinder {
+        telephonyManager =
+            applicationContext.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
+
         val name = "Bluetooth Service"
         val descriptionText =
             "Allows Cellular Companion to communicate with your Mac in the background."
@@ -177,17 +192,29 @@ class BluetoothService : Service() {
     }
 
     private fun startSharePhoneInfo() {
-        val telephonyManager: TelephonyManager =
-            applicationContext.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
+        if (ActivityCompat.checkSelfPermission(
+                applicationContext,
+                Manifest.permission.READ_PHONE_STATE
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            println("Error: Read phone state permission not granted")
+            return
+        }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val networkType =
+                telephonyManager.networkType
+            val signalStrength = telephonyManager.signalStrength
+            handleNetworkTypeChanged(networkType)
+            handleSignalStrengthLevelChanged(signalStrength?.level ?: -1)
+
             telephonyManager.registerTelephonyCallback(
                 applicationContext.mainExecutor,
                 telephonyCallback as TelephonyCallback
             )
         } else {
             telephonyManager.listen(
-                telephonyCallback as PhoneStateListener, /*PhoneStateListener.LISTEN_DISPLAY_INFO_CHANGED or*/
+                telephonyCallback as PhoneStateListener,
                 PhoneStateListener.LISTEN_SIGNAL_STRENGTHS
             )
         }
@@ -210,7 +237,16 @@ class BluetoothService : Service() {
 
     override fun onUnbind(intent: Intent?): Boolean {
         batteryLevelTimer.cancel()
-        // TODO: dispose telephony listeners
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            telephonyManager.unregisterTelephonyCallback(telephonyCallback as TelephonyCallback)
+        } else {
+            telephonyManager.listen(
+                telephonyCallback as PhoneStateListener,
+                PhoneStateListener.LISTEN_NONE
+            )
+        }
+
         return super.onUnbind(intent)
     }
 }

@@ -19,11 +19,7 @@ import com.ramcosta.composedestinations.navigation.DestinationsNavigator
 import com.xuanhan.cellularcompanion.destinations.HomePageDestination
 import com.xuanhan.cellularcompanion.destinations.IntroDestination
 import com.xuanhan.cellularcompanion.destinations.StartDestination
-import com.xuanhan.cellularcompanion.models.dataStore
-import com.xuanhan.cellularcompanion.viewmodels.HomePageViewModel
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 @Destination
@@ -31,20 +27,13 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun Start(navigator: DestinationsNavigator) {
-    val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
     LaunchedEffect(key1 = null) {
-        bluetoothModel.isSetupComplete = context.dataStore.data.map { settings ->
-            settings[bluetoothModel.isSetupCompleteKey] ?: false
-        }.first()
-
-        if (bluetoothModel.isSetupComplete) {
-            val homePageViewModel = HomePageViewModel()
+        if (isSetupComplete) {
             requiresBtPermissionCheck = true
-            homePageViewModel.prepareBluetooth(context)
             coroutineScope.launch(context = Dispatchers.Main.immediate) {
-                navigator.navigate(HomePageDestination(homePageViewModel)) {
+                navigator.navigate(HomePageDestination) {
                     popUpTo(StartDestination.route) { inclusive = true }
                 }
             }
