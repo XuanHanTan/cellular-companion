@@ -77,7 +77,7 @@ class BluetoothService : Service() {
 
     private fun handleSignalStrengthLevelChanged(signalStrengthLevel: Int) {
         val modifiedSignalStrengthLevel =
-            floor(((signalStrengthLevel + 1) / 5 * 4).toDouble() + 0.5).toInt() - 1
+            floor(((signalStrengthLevel.toDouble() + 1) / 5 * 4) + 0.5).toInt() - 1
         if (modifiedSignalStrengthLevel != prevModifiedSignalStrengthLevel) {
             println("Modified level $modifiedSignalStrengthLevel")
 
@@ -192,22 +192,7 @@ class BluetoothService : Service() {
     }
 
     private fun startSharePhoneInfo() {
-        if (ActivityCompat.checkSelfPermission(
-                applicationContext,
-                Manifest.permission.READ_PHONE_STATE
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
-            println("Error: Read phone state permission not granted")
-            return
-        }
-
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val networkType =
-                telephonyManager.networkType
-            val signalStrength = telephonyManager.signalStrength
-            handleNetworkTypeChanged(networkType)
-            handleSignalStrengthLevelChanged(signalStrength?.level ?: -1)
-
             telephonyManager.registerTelephonyCallback(
                 applicationContext.mainExecutor,
                 telephonyCallback as TelephonyCallback

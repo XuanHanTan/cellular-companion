@@ -87,6 +87,23 @@ class BluetoothModel {
 
     private var onConnectStatusUpdate: ((isConnected: Boolean) -> Unit)? = null
 
+    class NotificationType {
+        companion object {
+            const val EnableHotspot = "0"
+            const val DisableHotspot = "1"
+        }
+    }
+
+    class CommandType {
+        companion object {
+            const val HelloWorld = "0"
+            const val ShareHotspotDetails = "1"
+            const val SharePhoneInfo = "2"
+            const val ConnectToHotspot = "3"
+            const val DisconnectFromHotspot = "4"
+        }
+    }
+
     /**
      * This callback handles results during BLE scans.
      * */
@@ -321,6 +338,7 @@ class BluetoothModel {
             } else {
                 println("Error: Failed to write to descriptor of characteristic ${descriptor!!.characteristic.uuid} with status $status")
                 if (!isDisconnecting) {
+                    // Indicate that device is disconnected
                     onConnectStatusUpdate?.invoke(false)
                 }
             }
@@ -368,12 +386,12 @@ class BluetoothModel {
                 println("Received data from characteristic ${characteristic.uuid}: $text")
 
                 when (text) {
-                    "0" -> {
+                    NotificationType.EnableHotspot -> {
                         println("Enabling hotspot...")
 
                     }
 
-                    "1" -> {
+                    NotificationType.DisableHotspot -> {
                         println("Disabling hotspot...")
 
                     }
@@ -530,7 +548,7 @@ class BluetoothModel {
 
         // Write Hello World command to command characteristic
         commandCharacteristic!!.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
-        commandCharacteristic!!.value = "0".toByteArray()
+        commandCharacteristic!!.value = CommandType.HelloWorld.toByteArray()
         gatt!!.writeCharacteristic(commandCharacteristic!!)
     }
 
@@ -702,7 +720,7 @@ class BluetoothModel {
         shareHotspotDetails2 = {
             commandCharacteristic!!.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
             val (cipherText, iv) = aes.encrypt("$ssid $password")
-            commandCharacteristic!!.value = "1 $iv $cipherText".toByteArray()
+            commandCharacteristic!!.value = "${CommandType.ShareHotspotDetails} $iv $cipherText".toByteArray()
             gatt!!.writeCharacteristic(commandCharacteristic!!)
         }
 
@@ -756,7 +774,7 @@ class BluetoothModel {
         sharePhoneInfo2 = {
             commandCharacteristic!!.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
             commandCharacteristic!!.value =
-                "2 $signalLevel $networkType $batteryPercentage".toByteArray()
+                "${CommandType.SharePhoneInfo} $signalLevel $networkType $batteryPercentage".toByteArray()
             gatt!!.writeCharacteristic(commandCharacteristic!!)
         }
 
