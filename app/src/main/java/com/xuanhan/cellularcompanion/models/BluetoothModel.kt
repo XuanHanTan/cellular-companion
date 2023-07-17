@@ -29,6 +29,8 @@ import com.xuanhan.cellularcompanion.broadcastreceivers.BondStateBroadcastReceiv
 import com.xuanhan.cellularcompanion.isSetupComplete
 import com.xuanhan.cellularcompanion.isSetupCompleteKey
 import com.xuanhan.cellularcompanion.utilities.AES
+import com.xuanhan.cellularcompanion.utilities.HotspotOnStartTetheringCallback
+import com.xuanhan.cellularcompanion.utilities.WifiHotspotManager
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import java.util.UUID
@@ -50,6 +52,7 @@ class BluetoothModel {
     private lateinit var context: Context
     private lateinit var bluetoothAdapter: BluetoothAdapter
     private lateinit var aes: AES
+    private lateinit var wifiHotspotManager: WifiHotspotManager
     private val commandCharacteristicUUID = "00000001-0000-1000-8000-00805f9b34fb"
     private val notificationCharacteristicUUID = "00000002-0000-1000-8000-00805f9b34fb"
 
@@ -74,6 +77,8 @@ class BluetoothModel {
     private var onHotspotDetailsSharedCallback: (() -> Unit)? = null
     private var isSharingPhoneInfo = false
     private var sharePhoneInfo2: (() -> Unit)? = null
+    private var isConnectingToHotspot = false
+    private var connectHotspot2: (() -> Unit)? = null
 
     private var onScanFailedCallback: (() -> Unit)? = null
     private var onUnexpectedErrorCallback: (() -> Unit)? = null
@@ -310,6 +315,9 @@ class BluetoothModel {
                 } else if (isSharingPhoneInfo) {
                     // Share phone info to device
                     sharePhoneInfo2?.invoke()
+                } else if (isConnectingToHotspot) {
+                    // Request device to connect to hotspot
+                    connectHotspot2?.invoke()
                 }
             } else {
                 onUnexpectedErrorCallback?.invoke()
@@ -388,12 +396,20 @@ class BluetoothModel {
                 when (text) {
                     NotificationType.EnableHotspot -> {
                         println("Enabling hotspot...")
-
+                        if (wifiHotspotManager.isTetherActive) {
+                            onTetheringStarted()
+                        } else {
+                            wifiHotspotManager.startTethering(myHotspotOnStartTetheringCallback)
+                        }
                     }
 
                     NotificationType.DisableHotspot -> {
                         println("Disabling hotspot...")
-
+                        if (wifiHotspotManager.isTetherActive) {
+                            wifiHotspotManager.stopTethering()
+                        } else {
+                            onTetheringStopped()
+                        }
                     }
 
                     else -> {
@@ -415,6 +431,62 @@ class BluetoothModel {
         onBondFailedCallback?.invoke()
     }
 
+    private val myHotspotOnStartTetheringCallback = object : HotspotOnStartTetheringCallback() {
+        override fun onTetheringStarted() {
+            this@BluetoothModel.onTetheringStarted()
+        }
+
+        override fun onTetheringFailed() {
+            println("Hotspot failed to start")
+            // TODO: handle hotspot failed to start
+        }
+    }
+
+    private fun onTetheringStarted() {
+        println("Hotspot started")
+
+        if (gatt == null) {
+            println("Error: Device is unavailable.")
+            return
+        }
+        if (commandCharacteristic == null) {
+            println("Error: Command characteristic is unavailable")
+            return
+        }
+
+        // Check for Bluetooth Connect permission on Android 12+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (ActivityCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.BLUETOOTH_CONNECT
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                println("Error: The Bluetooth Connect permission has not been granted.")
+                return
+            }
+        }
+
+        enqueueOperation {
+            connectHotspot2 = {
+                commandCharacteristic!!.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+                commandCharacteristic!!.value = CommandType.ConnectToHotspot.toByteArray()
+                gatt!!.writeCharacteristic(commandCharacteristic!!)
+            }
+
+            if (bluetoothManager.getConnectedDevices(BluetoothProfile.GATT)
+                    .find { it.address == connectDevice?.address } == null
+            ) {
+                startScan()
+            } else {
+                connectHotspot2!!.invoke()
+            }
+        }
+    }
+
+    private fun onTetheringStopped() {
+        println("Hotspot stopped")
+    }
+
     @Synchronized
     private fun enqueueOperation(operation: () -> Unit) {
         operationQueue.add(operation)
@@ -434,6 +506,7 @@ class BluetoothModel {
             initOnConnectCallback = null
             isSharingHotspotDetails = false
             isSharingPhoneInfo = false
+            isConnectingToHotspot = false
             onHotspotDetailsSharedCallback = null
 
             it.invoke()
@@ -525,6 +598,7 @@ class BluetoothModel {
         bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
         bluetoothAdapter = bluetoothManager.adapter
         aes = AES(sharedKey!!)
+        wifiHotspotManager = WifiHotspotManager(context)
 
         // Start BLE scan
         startScan()
@@ -720,7 +794,8 @@ class BluetoothModel {
         shareHotspotDetails2 = {
             commandCharacteristic!!.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
             val (cipherText, iv) = aes.encrypt("$ssid $password")
-            commandCharacteristic!!.value = "${CommandType.ShareHotspotDetails} $iv $cipherText".toByteArray()
+            commandCharacteristic!!.value =
+                "${CommandType.ShareHotspotDetails} $iv $cipherText".toByteArray()
             gatt!!.writeCharacteristic(commandCharacteristic!!)
         }
 
@@ -734,6 +809,7 @@ class BluetoothModel {
     }
 
     suspend fun markSetupComplete() {
+        isSetupComplete = true
         context.dataStore.edit { settings ->
             settings[isSetupCompleteKey] = true
         }

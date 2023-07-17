@@ -7,6 +7,7 @@ import android.bluetooth.BluetoothManager
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -27,6 +28,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -40,6 +43,7 @@ import com.ramcosta.composedestinations.annotation.Destination
 import com.ramcosta.composedestinations.navigation.DestinationsNavigator
 import com.xuanhan.cellularcompanion.destinations.QRCodeDestination
 import com.xuanhan.cellularcompanion.viewmodels.PermissionViewModel
+import kotlinx.coroutines.flow.update
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
 @Composable
@@ -51,7 +55,28 @@ fun Permissions(navigator: DestinationsNavigator) {
     } else {
         null
     }
-    val permissions = ArrayList<PermissionViewModel>().apply {
+    val permissions = ArrayList<PermissionViewModel>()
+    val writeSystemSettingsLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult(),
+        onResult = {
+            if (Settings.System.canWrite(context)) {
+                permissions.find { it.status.permission == Manifest.permission.WRITE_SETTINGS }
+                    ?.let {
+                        it.isSpecialPermissionGranted.update { true }
+                    }
+            }
+        })
+    permissions.apply {
+        add(
+            PermissionViewModel(
+                "Writing system settings",
+                "Required to enable and disable hotspot functionality automatically.",
+                rememberPermissionState(permission = Manifest.permission.WRITE_SETTINGS),
+                isSpecialPermission = true,
+                specialPermissionLauncher = writeSystemSettingsLauncher,
+                context = context
+            )
+        )
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             add(
                 PermissionViewModel(
@@ -132,28 +157,48 @@ fun Permissions(navigator: DestinationsNavigator) {
             permissions.forEach { permissionDescription ->
                 ListItem(
                     leadingContent = {
-                        when (permissionDescription.status.status) {
-                            PermissionStatus.Granted -> {
-                                Icon(
-                                    painter = painterResource(id = R.drawable.outline_done_24),
-                                    contentDescription = "Permission granted",
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
-                            }
+                        val grantedIcon = @Composable {
+                            Icon(
+                                painter = painterResource(id = R.drawable.outline_done_24),
+                                contentDescription = "Permission granted",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        val deniedIcon = @Composable {
+                            Icon(
+                                painter = painterResource(id = R.drawable.outline_close_24),
+                                contentDescription = "Permission denied",
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                        }
+                        val notGrantedIcon = @Composable {
+                            Icon(
+                                painter = painterResource(id = R.drawable.outline_done_24),
+                                contentDescription = "Permission not granted",
+                                tint = MaterialTheme.colorScheme.outline
+                            )
+                        }
 
-                            is PermissionStatus.Denied -> {
-                                if (permissionDescription.status.status.shouldShowRationale) {
-                                    Icon(
-                                        painter = painterResource(id = R.drawable.outline_close_24),
-                                        contentDescription = "Permission denied",
-                                        tint = MaterialTheme.colorScheme.error
-                                    )
-                                } else {
-                                    Icon(
-                                        painter = painterResource(id = R.drawable.outline_done_24),
-                                        contentDescription = "Permission granted",
-                                        tint = MaterialTheme.colorScheme.outline
-                                    )
+                        if (permissionDescription.isSpecialPermission) {
+                            val isSpecialPermissionGranted: Boolean by permissionDescription.isSpecialPermissionGranted.collectAsState()
+
+                            if (isSpecialPermissionGranted) {
+                                grantedIcon()
+                            } else {
+                                notGrantedIcon()
+                            }
+                        } else {
+                            when (permissionDescription.status.status) {
+                                PermissionStatus.Granted -> {
+                                    grantedIcon()
+                                }
+
+                                is PermissionStatus.Denied -> {
+                                    if (permissionDescription.status.status.shouldShowRationale) {
+                                        deniedIcon()
+                                    } else {
+                                        notGrantedIcon()
+                                    }
                                 }
                             }
                         }
@@ -165,12 +210,15 @@ fun Permissions(navigator: DestinationsNavigator) {
                         }
                     },
                     modifier = Modifier.clickable {
-                        permissionDescription.grantPermission()
+                        permissionDescription.grantPermission(context)
                     }
                 )
             }
             Spacer(modifier = Modifier.weight(1f))
-            if (permissions.all { permissionDescription -> permissionDescription.status.status == PermissionStatus.Granted }) {
+            if (permissions.all { permissionDescription ->
+                    val isSpecialPermissionGranted: Boolean by permissionDescription.isSpecialPermissionGranted.collectAsState()
+                    permissionDescription.status.status == PermissionStatus.Granted || (permissionDescription.isSpecialPermission && isSpecialPermissionGranted)
+                }) {
                 Button(onClick = {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                         btConnectPermission!!.launchPermissionRequest()

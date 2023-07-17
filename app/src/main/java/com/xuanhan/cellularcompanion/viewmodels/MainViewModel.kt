@@ -20,7 +20,7 @@ class MainViewModel {
     private val _isShowingConnectFailedDialog = MutableStateFlow(false)
     val isShowingConnectFailedDialog: StateFlow<Boolean> =
         _isShowingConnectFailedDialog.asStateFlow()
-    val _isShowingBondFailedDialog = MutableStateFlow(false)
+    private val _isShowingBondFailedDialog = MutableStateFlow(false)
     val isShowingBondFailedDialog: StateFlow<Boolean> =
         _isShowingBondFailedDialog.asStateFlow()
     private val _isBluetoothEnabled = MutableStateFlow(true)

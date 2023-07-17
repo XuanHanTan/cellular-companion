@@ -60,6 +60,7 @@ dependencies {
     implementation("com.google.accompanist:accompanist-permissions:0.31.3-beta")
     implementation("io.github.raamcosta.compose-destinations:animations-core:1.9.42-beta")
     ksp("io.github.raamcosta.compose-destinations:ksp:1.9.42-beta")
+    implementation("com.linkedin.dexmaker:dexmaker:2.28.3")
     implementation("androidx.datastore:datastore-preferences:1.0.0")
     implementation("androidx.navigation:navigation-compose:2.6.0")
     implementation("androidx.core:core-ktx:1.10.1")

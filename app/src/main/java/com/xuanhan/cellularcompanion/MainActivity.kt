@@ -67,14 +67,17 @@ class MainActivity : ComponentActivity() {
                 viewModel.setBluetoothEnabled(this)
             }
         }
+    private var serviceConnected = false
     private val connection = object : ServiceConnection {
         override fun onServiceConnected(className: ComponentName, service: IBinder) {
             val binder = service as BluetoothService.BluetoothServiceBinder
             bluetoothService = binder.getService(bluetoothModel)
+            serviceConnected = true
             println("Service connected")
         }
 
         override fun onServiceDisconnected(arg0: ComponentName) {
+            serviceConnected = false
             println("Service disconnected")
         }
     }
@@ -303,6 +306,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onStop() {
         super.onStop()
-        unbindService(connection)
+        if (serviceConnected) {
+            unbindService(connection)
+        }
     }
 }
