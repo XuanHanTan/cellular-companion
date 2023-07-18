@@ -15,8 +15,10 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
@@ -32,8 +34,10 @@ import com.xuanhan.cellularcompanion.destinations.SettingUp2Destination
 @OptIn(ExperimentalMaterial3Api::class)
 @Destination
 fun HotspotInfo(navigator: DestinationsNavigator) {
-    val ssid = remember { mutableStateOf("") }
-    val password = remember { mutableStateOf("") }
+    var ssid by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+
+    // TODO: ensure that wifi password is in ASCII and does not contain "
 
     Scaffold(topBar = {
         LargeTopAppBar(
@@ -58,12 +62,19 @@ fun HotspotInfo(navigator: DestinationsNavigator) {
                         contentDescription = "WiFi icon"
                     )
                 },
-                value = ssid.value,
+                value = ssid,
                 label = {
                     Text("SSID")
                 },
+                supportingText = {
+                    Text(
+                        text = "${ssid.length}/32",
+                    )
+                },
                 onValueChange = { newValue ->
-                    ssid.value = newValue
+                    if (newValue.length <= 32) {
+                        ssid = newValue
+                    }
                 },
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -75,12 +86,19 @@ fun HotspotInfo(navigator: DestinationsNavigator) {
                         contentDescription = "Password icon"
                     )
                 },
-                value = password.value,
+                value = password,
                 label = {
                     Text("Password")
                 },
+                supportingText = {
+                    Text(
+                        text = "${password.length}/63",
+                    )
+                },
                 onValueChange = { newValue ->
-                    password.value = newValue
+                    if (newValue.length <= 63) {
+                        password = newValue
+                    }
                 },
                 visualTransformation = PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
@@ -88,10 +106,10 @@ fun HotspotInfo(navigator: DestinationsNavigator) {
             )
             Spacer(modifier = Modifier.weight(1f))
             Button(onClick = {
-                navigator.navigate(SettingUp2Destination(ssid.value, password.value)) {
+                navigator.navigate(SettingUp2Destination(ssid, password)) {
                     popUpTo(HotspotInfoDestination.route) { inclusive = true }
                 }
-            }, enabled = ssid.value.isNotEmpty()) {
+            }, enabled = ssid.isNotEmpty()) {
                 Text("Next")
             }
         }

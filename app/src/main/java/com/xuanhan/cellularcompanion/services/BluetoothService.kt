@@ -142,17 +142,13 @@ class BluetoothService : Service() {
         ): BluetoothService {
             this@BluetoothService.bluetoothModel = bluetoothModel
 
-            if (!bluetoothModel.isInitialized) {
-                CoroutineScope(Dispatchers.IO).launch {
-                    println("Initialising Bluetooth model now...")
-                    bluetoothModel.initializeFromDataStore(
-                        {
-                            startSharePhoneInfo()
-                        }, applicationContext
-                    )
-                }
-            } else {
-                startSharePhoneInfo()
+            CoroutineScope(Dispatchers.IO).launch {
+                println("Initialising Bluetooth model now...")
+                bluetoothModel.initializeFromDataStore(
+                    {
+                        startSharePhoneInfo()
+                    }, applicationContext
+                )
             }
 
             return this@BluetoothService

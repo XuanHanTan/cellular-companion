@@ -33,6 +33,8 @@ import com.xuanhan.cellularcompanion.utilities.HotspotOnStartTetheringCallback
 import com.xuanhan.cellularcompanion.utilities.WifiHotspotManager
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import java.util.Timer
+import java.util.TimerTask
 import java.util.UUID
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.regex.Pattern
@@ -66,8 +68,7 @@ class BluetoothModel {
     private var isConnecting = false
     private var isDisconnecting = false
     private var connectionRetryCount = 0
-    val isInitialized: Boolean
-        get() = connectDevice != null && gatt != null && commandCharacteristic != null && notificationCharacteristic != null
+    private var hotspotShareRetryCount = 0
 
     private var isFirstInitializing = false
     private var isInitializing = false
@@ -193,6 +194,9 @@ class BluetoothModel {
                     this@BluetoothModel.gatt = gatt
 
                     println("Connected to device ${gatt!!.device.address}")
+
+                    // Stop scan for devices
+                    stopScan()
 
                     // Start discovering services of GATT device
                     gatt.discoverServices()
@@ -376,7 +380,14 @@ class BluetoothModel {
                 if (isFirstInitializing) {
                     onConnectFailedCallback?.invoke()
                 } else if (isSharingHotspotDetails) {
-                    onHotspotDetailsShareFailedCallback?.invoke()
+                    if (hotspotShareRetryCount < 5) {
+                        // Retry sharing hotspot details to device
+                        shareHotspotDetails2?.invoke()
+                        hotspotShareRetryCount++
+                    } else {
+                        // Show error message
+                        onHotspotDetailsShareFailedCallback?.invoke()
+                    }
                 } else {
                     indicateOperationComplete()
                 }
@@ -445,42 +456,47 @@ class BluetoothModel {
     private fun onTetheringStarted() {
         println("Hotspot started")
 
-        if (gatt == null) {
-            println("Error: Device is unavailable.")
-            return
-        }
-        if (commandCharacteristic == null) {
-            println("Error: Command characteristic is unavailable")
-            return
-        }
+        val timer = Timer()
+        timer.schedule(object : TimerTask() {
+            override fun run() {
+                if (gatt == null) {
+                    println("Error: Device is unavailable.")
+                    return
+                }
+                if (commandCharacteristic == null) {
+                    println("Error: Command characteristic is unavailable")
+                    return
+                }
 
-        // Check for Bluetooth Connect permission on Android 12+
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            if (ActivityCompat.checkSelfPermission(
-                    context,
-                    Manifest.permission.BLUETOOTH_CONNECT
-                ) != PackageManager.PERMISSION_GRANTED
-            ) {
-                println("Error: The Bluetooth Connect permission has not been granted.")
-                return
-            }
-        }
+                // Check for Bluetooth Connect permission on Android 12+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    if (ActivityCompat.checkSelfPermission(
+                            context,
+                            Manifest.permission.BLUETOOTH_CONNECT
+                        ) != PackageManager.PERMISSION_GRANTED
+                    ) {
+                        println("Error: The Bluetooth Connect permission has not been granted.")
+                        return
+                    }
+                }
 
-        enqueueOperation {
-            connectHotspot2 = {
-                commandCharacteristic!!.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
-                commandCharacteristic!!.value = CommandType.ConnectToHotspot.toByteArray()
-                gatt!!.writeCharacteristic(commandCharacteristic!!)
-            }
+                enqueueOperation {
+                    connectHotspot2 = {
+                        commandCharacteristic!!.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+                        commandCharacteristic!!.value = CommandType.ConnectToHotspot.toByteArray()
+                        gatt!!.writeCharacteristic(commandCharacteristic!!)
+                    }
 
-            if (bluetoothManager.getConnectedDevices(BluetoothProfile.GATT)
-                    .find { it.address == connectDevice?.address } == null
-            ) {
-                startScan()
-            } else {
-                connectHotspot2!!.invoke()
+                    if (bluetoothManager.getConnectedDevices(BluetoothProfile.GATT)
+                            .find { it.address == connectDevice?.address } == null
+                    ) {
+                        startScan()
+                    } else {
+                        connectHotspot2!!.invoke()
+                    }
+                }
             }
-        }
+        }, 3000)
     }
 
     private fun onTetheringStopped() {
@@ -630,6 +646,9 @@ class BluetoothModel {
      * This function starts the scan for BLE devices matching the set service UUID. The serviceUUID variable has to be set before calling this function.
      * */
     private fun startScan() {
+        // Reset BLE connection before starting scan
+        reset()
+
         // Scan for BLE devices advertising this service UUID
         val filter =
             ScanFilter.Builder().setServiceUuid(ParcelUuid.fromString(serviceUUID)).build()
@@ -793,7 +812,7 @@ class BluetoothModel {
 
         shareHotspotDetails2 = {
             commandCharacteristic!!.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
-            val (cipherText, iv) = aes.encrypt("$ssid $password")
+            val (cipherText, iv) = aes.encrypt("\"$ssid\" \"$password\"")
             commandCharacteristic!!.value =
                 "${CommandType.ShareHotspotDetails} $iv $cipherText".toByteArray()
             gatt!!.writeCharacteristic(commandCharacteristic!!)
@@ -904,5 +923,6 @@ class BluetoothModel {
         isConnecting = false
         isDisconnecting = false
         connectionRetryCount = 0
+        hotspotShareRetryCount = 0
     }
 }

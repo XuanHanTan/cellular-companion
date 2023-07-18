@@ -1,6 +1,6 @@
 package com.xuanhan.cellularcompanion.utilities
 
-import com.ramcosta.composedestinations.navargs.utils.toBase64Str
+import android.util.Base64
 import javax.crypto.Cipher
 import javax.crypto.spec.SecretKeySpec
 
@@ -23,6 +23,6 @@ class AES(password: String) {
         cipher.init(Cipher.ENCRYPT_MODE, key)
         val cipherText = cipher.doFinal(plainText)
         val iv = cipher.iv
-        return Pair(cipherText.toBase64Str(), iv.toHexString())
+        return Pair(Base64.encodeToString(cipherText, 0).trim(), iv.toHexString())
     }
 }
