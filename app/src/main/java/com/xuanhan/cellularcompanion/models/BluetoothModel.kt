@@ -80,6 +80,8 @@ class BluetoothModel {
     private var sharePhoneInfo2: (() -> Unit)? = null
     private var isConnectingToHotspot = false
     private var connectHotspot2: (() -> Unit)? = null
+    private var isDisconnectingFromHotspot = false
+    private var disconnectHotspot2: (() -> Unit)? = null
 
     private var onScanFailedCallback: (() -> Unit)? = null
     private var onUnexpectedErrorCallback: (() -> Unit)? = null
@@ -91,7 +93,7 @@ class BluetoothModel {
         initialize(context)
     }
 
-    private var onConnectStatusUpdate: ((isConnected: Boolean) -> Unit)? = null
+    private var onConnectStatusUpdate: ((status: ConnectStatus) -> Unit)? = null
 
     class NotificationType {
         companion object {
@@ -107,6 +109,15 @@ class BluetoothModel {
             const val SharePhoneInfo = "2"
             const val ConnectToHotspot = "3"
             const val DisconnectFromHotspot = "4"
+        }
+    }
+
+    companion object {
+        enum class ConnectStatus {
+            Disconnected,
+            Idle,
+            Connecting,
+            Connected
         }
     }
 
@@ -323,6 +334,10 @@ class BluetoothModel {
                     // Request device to connect to hotspot
                     connectHotspot2?.invoke()
                     return
+                } else if (isDisconnectingFromHotspot) {
+                    // Request device to disconnect from hotspot
+                    disconnectHotspot2?.invoke()
+                    return
                 }
 
                 // Subscribe to notifications on the notification characteristic
@@ -350,12 +365,12 @@ class BluetoothModel {
                 }
 
                 // Indicate that device is connected
-                onConnectStatusUpdate?.invoke(true)
+                onConnectStatusUpdate?.invoke(ConnectStatus.Idle)
             } else {
                 println("Error: Failed to write to descriptor of characteristic ${descriptor!!.characteristic.uuid} with status $status")
                 if (!isDisconnecting) {
                     // Indicate that device is disconnected
-                    onConnectStatusUpdate?.invoke(false)
+                    onConnectStatusUpdate?.invoke(ConnectStatus.Disconnected)
                 }
             }
         }
@@ -375,6 +390,9 @@ class BluetoothModel {
                     initOnConnectCallback?.invoke()
                 } else if (isSharingHotspotDetails) {
                     onHotspotDetailsSharedCallback?.invoke()
+                } else if (isConnectingToHotspot) {
+                    // Indicate that hotspot is connected
+                    onConnectStatusUpdate?.invoke(ConnectStatus.Connected)
                 }
 
                 indicateOperationComplete()
@@ -411,6 +429,10 @@ class BluetoothModel {
                 when (text) {
                     NotificationType.EnableHotspot -> {
                         println("Enabling hotspot...")
+
+                        // Indicate that hotspot is connecting
+                        onConnectStatusUpdate?.invoke(ConnectStatus.Connecting)
+
                         if (wifiHotspotManager.isTetherActive) {
                             onTetheringStarted()
                         } else {
@@ -420,6 +442,10 @@ class BluetoothModel {
 
                     NotificationType.DisableHotspot -> {
                         println("Disabling hotspot...")
+
+                        // Indicate that hotspot is disconnected
+                        onConnectStatusUpdate?.invoke(ConnectStatus.Idle)
+
                         if (wifiHotspotManager.isTetherActive) {
                             wifiHotspotManager.stopTethering()
                         } else {
@@ -485,6 +511,8 @@ class BluetoothModel {
                 }
 
                 enqueueOperation {
+                    isConnectingToHotspot = true
+
                     connectHotspot2 = {
                         commandCharacteristic!!.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
                         commandCharacteristic!!.value = CommandType.ConnectToHotspot.toByteArray()
@@ -505,6 +533,45 @@ class BluetoothModel {
 
     private fun onTetheringStopped() {
         println("Hotspot stopped")
+
+        if (gatt == null) {
+            println("Error: Device is unavailable.")
+            return
+        }
+        if (commandCharacteristic == null) {
+            println("Error: Command characteristic is unavailable")
+            return
+        }
+
+        // Check for Bluetooth Connect permission on Android 12+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (ActivityCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.BLUETOOTH_CONNECT
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                println("Error: The Bluetooth Connect permission has not been granted.")
+                return
+            }
+        }
+
+        enqueueOperation {
+            isDisconnectingFromHotspot = true
+
+            disconnectHotspot2 = {
+                commandCharacteristic!!.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+                commandCharacteristic!!.value = CommandType.DisconnectFromHotspot.toByteArray()
+                gatt!!.writeCharacteristic(commandCharacteristic!!)
+            }
+
+            if (bluetoothManager.getConnectedDevices(BluetoothProfile.GATT)
+                    .find { it.address == connectDevice?.address } == null
+            ) {
+                startScan()
+            } else {
+                disconnectHotspot2!!.invoke()
+            }
+        }
     }
 
     @Synchronized
@@ -527,6 +594,7 @@ class BluetoothModel {
             isSharingHotspotDetails = false
             isSharingPhoneInfo = false
             isConnectingToHotspot = false
+            isDisconnectingFromHotspot = false
             onHotspotDetailsSharedCallback = null
 
             it.invoke()
@@ -908,7 +976,7 @@ class BluetoothModel {
     }
 
     fun registerForUIChanges(
-        onConnectStatusUpdate: (isConnected: Boolean) -> Unit
+        onConnectStatusUpdate: (status: ConnectStatus) -> Unit
     ) {
         this.onConnectStatusUpdate = onConnectStatusUpdate
     }
