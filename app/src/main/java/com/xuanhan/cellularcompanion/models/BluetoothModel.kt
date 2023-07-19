@@ -310,19 +310,23 @@ class BluetoothModel {
                     } else {
                         onBonded()
                     }
-                } else if (isInitializing) {
-                    // Subscribe to notifications on the command characteristic
-                    enableNotifications()
+                    return
                 } else if (isSharingHotspotDetails) {
                     // Share hotspot details to device
                     shareHotspotDetails2?.invoke()
+                    return
                 } else if (isSharingPhoneInfo) {
                     // Share phone info to device
                     sharePhoneInfo2?.invoke()
+                    return
                 } else if (isConnectingToHotspot) {
                     // Request device to connect to hotspot
                     connectHotspot2?.invoke()
+                    return
                 }
+
+                // Subscribe to notifications on the notification characteristic
+                enableNotifications()
             } else {
                 onUnexpectedErrorCallback?.invoke()
                 println("Error: MTU change failed with status $status")
