@@ -212,8 +212,16 @@ class BluetoothModel {
                     // Start discovering services of GATT device
                     gatt.discoverServices()
                 } else {
-                    // Start scan for devices if disconnected due to issues such as out of range, device powered off etc.
                     if (isSetupComplete) {
+                        // Turn off hotspot if needed
+                        if (wifiHotspotManager.isTetherActive) {
+                            disableHotspot(noBluetooth = true)
+                        }
+
+                        // Set connect status to disconnected
+                        onConnectStatusUpdates.forEach { it.invoke(ConnectStatus.Disconnected) }
+
+                        // Start scan for devices if disconnected due to issues such as out of range, device powered off etc.
                         startScan()
                     }
                     println("Disconnected from device advertising: ${gatt!!.device.address}")
@@ -950,7 +958,7 @@ class BluetoothModel {
         }
     }
 
-    fun disableHotspot() {
+    fun disableHotspot(noBluetooth: Boolean = false) {
         // Indicate that hotspot is disconnected
         onConnectStatusUpdates.forEach { it.invoke(ConnectStatus.Idle) }
 
@@ -958,7 +966,9 @@ class BluetoothModel {
             wifiHotspotManager.stopTethering()
         }
 
-        onTetheringStopped()
+        if (!noBluetooth) {
+            onTetheringStopped()
+        }
     }
 
     /**
