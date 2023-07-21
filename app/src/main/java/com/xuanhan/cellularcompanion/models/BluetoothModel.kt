@@ -93,7 +93,7 @@ class BluetoothModel {
         initialize(context)
     }
 
-    private var onConnectStatusUpdate: ((status: ConnectStatus) -> Unit)? = null
+    private var onConnectStatusUpdates: ArrayList<((status: ConnectStatus) -> Unit)> = arrayListOf()
 
     class NotificationType {
         companion object {
@@ -365,12 +365,12 @@ class BluetoothModel {
                 }
 
                 // Indicate that device is connected
-                onConnectStatusUpdate?.invoke(ConnectStatus.Idle)
+                onConnectStatusUpdates.forEach { it.invoke(ConnectStatus.Idle) }
             } else {
                 println("Error: Failed to write to descriptor of characteristic ${descriptor!!.characteristic.uuid} with status $status")
                 if (!isDisconnecting) {
                     // Indicate that device is disconnected
-                    onConnectStatusUpdate?.invoke(ConnectStatus.Disconnected)
+                    onConnectStatusUpdates.forEach { it.invoke(ConnectStatus.Disconnected) }
                 }
             }
         }
@@ -392,7 +392,7 @@ class BluetoothModel {
                     onHotspotDetailsSharedCallback?.invoke()
                 } else if (isConnectingToHotspot) {
                     // Indicate that hotspot is connected
-                    onConnectStatusUpdate?.invoke(ConnectStatus.Connected)
+                    onConnectStatusUpdates.forEach { it.invoke(ConnectStatus.Connected) }
                 }
 
                 indicateOperationComplete()
@@ -941,7 +941,7 @@ class BluetoothModel {
 
     fun enableHotspot() {
         // Indicate that hotspot is connecting
-        onConnectStatusUpdate?.invoke(ConnectStatus.Connecting)
+        onConnectStatusUpdates.forEach { it.invoke(ConnectStatus.Connecting) }
 
         if (wifiHotspotManager.isTetherActive) {
             onTetheringStarted()
@@ -952,7 +952,7 @@ class BluetoothModel {
 
     fun disableHotspot() {
         // Indicate that hotspot is disconnected
-        onConnectStatusUpdate?.invoke(ConnectStatus.Idle)
+        onConnectStatusUpdates.forEach { it.invoke(ConnectStatus.Idle) }
 
         if (wifiHotspotManager.isTetherActive) {
             wifiHotspotManager.stopTethering()
@@ -985,7 +985,7 @@ class BluetoothModel {
     fun registerForUIChanges(
         onConnectStatusUpdate: (status: ConnectStatus) -> Unit
     ) {
-        this.onConnectStatusUpdate = onConnectStatusUpdate
+        this.onConnectStatusUpdates.add(onConnectStatusUpdate)
     }
 
     /**

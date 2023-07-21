@@ -39,9 +39,11 @@ import com.ramcosta.composedestinations.animations.defaults.RootNavGraphDefaultA
 import com.ramcosta.composedestinations.animations.rememberAnimatedNavHostEngine
 import com.xuanhan.cellularcompanion.destinations.StartDestination
 import com.xuanhan.cellularcompanion.models.BluetoothModel
+import com.xuanhan.cellularcompanion.models.BluetoothModel.Companion.ConnectStatus
 import com.xuanhan.cellularcompanion.models.dataStore
 import com.xuanhan.cellularcompanion.services.BluetoothService
 import com.xuanhan.cellularcompanion.ui.theme.AppTheme
+import com.xuanhan.cellularcompanion.utilities.WifiHotspotManager
 import com.xuanhan.cellularcompanion.viewmodels.MainViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -61,6 +63,7 @@ var isSetupComplete by Delegates.notNull<Boolean>()
 // TODO: handle missing permissions
 class MainActivity : ComponentActivity() {
     private val viewModel = MainViewModel()
+    private lateinit var hotspotManager: WifiHotspotManager
     private val enableBt =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result: ActivityResult ->
             if (result.resultCode == Activity.RESULT_OK) {
@@ -71,7 +74,7 @@ class MainActivity : ComponentActivity() {
     private val connection = object : ServiceConnection {
         override fun onServiceConnected(className: ComponentName, service: IBinder) {
             val binder = service as BluetoothService.BluetoothServiceBinder
-            bluetoothService = binder.getService(bluetoothModel)
+            bluetoothService = binder.getService()
             serviceConnected = true
             println("Service connected")
         }
@@ -90,8 +93,15 @@ class MainActivity : ComponentActivity() {
                 settings[isSetupCompleteKey] ?: false
             }.first()
             if (isSetupComplete) {
+                startService()
                 connectService()
             }
+        }
+    }
+
+    internal fun startService() {
+        Intent(this, BluetoothService::class.java).also { intent ->
+            startService(intent)
         }
     }
 
@@ -113,6 +123,8 @@ class MainActivity : ComponentActivity() {
             val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
             enableBt.launch(enableBtIntent)
         }
+
+        hotspotManager = WifiHotspotManager(this)
 
         setContent {
             val navHostEngine = rememberAnimatedNavHostEngine(
@@ -301,6 +313,10 @@ class MainActivity : ComponentActivity() {
         println("onWindowFocusChanged")
         if (hasFocus) {
             viewModel.setBluetoothEnabled(this)
+
+            if ((viewModel.connectStatus == ConnectStatus.Connected || viewModel.connectStatus == ConnectStatus.Connecting) && !hotspotManager.isTetherActive) {
+                bluetoothModel.disableHotspot()
+            }
         }
     }
 

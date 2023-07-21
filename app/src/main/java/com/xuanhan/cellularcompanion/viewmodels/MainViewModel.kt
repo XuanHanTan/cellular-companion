@@ -3,6 +3,7 @@ package com.xuanhan.cellularcompanion.viewmodels
 import android.bluetooth.BluetoothManager
 import android.content.Context
 import com.xuanhan.cellularcompanion.bluetoothModel
+import com.xuanhan.cellularcompanion.models.BluetoothModel.Companion.ConnectStatus
 import com.xuanhan.cellularcompanion.requiresBtPermissionCheck
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -27,6 +28,9 @@ class MainViewModel {
     val isBluetoothEnabled: StateFlow<Boolean> =
         _isBluetoothEnabled.asStateFlow()
 
+    var connectStatus = ConnectStatus.Disconnected
+        private set
+
     init {
         bluetoothModel.registerForErrorHandling(
             ::showScanFailedDialog,
@@ -35,6 +39,8 @@ class MainViewModel {
             ::showBondFailedDialog,
             ::showHotspotDetailsShareFailedDialog,
         )
+
+        bluetoothModel.registerForUIChanges(onConnectStatusUpdate = ::onConnectStatusUpdate)
     }
 
     private fun showScanFailedDialog() {
@@ -92,5 +98,9 @@ class MainViewModel {
             _isBluetoothEnabled.value = bluetoothAdapter.isEnabled
         }
         return _isBluetoothEnabled.value
+    }
+
+    private fun onConnectStatusUpdate(status: ConnectStatus) {
+        connectStatus = status
     }
 }

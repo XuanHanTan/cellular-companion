@@ -22,7 +22,7 @@ import android.telephony.TelephonyManager
 import androidx.annotation.RequiresApi
 import androidx.core.app.ActivityCompat
 import com.xuanhan.cellularcompanion.MainActivity
-import com.xuanhan.cellularcompanion.models.BluetoothModel
+import com.xuanhan.cellularcompanion.bluetoothModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -30,9 +30,9 @@ import java.util.Timer
 import java.util.TimerTask
 import kotlin.math.floor
 
+// TODO: Make service start on boot
 class BluetoothService : Service() {
     private val binder = BluetoothServiceBinder()
-    private lateinit var bluetoothModel: BluetoothModel
     private val batteryLevelTimer = Timer()
     private var prevModifiedSignalStrengthLevel = -1
     private var prevNetworkType = ""
@@ -137,25 +137,18 @@ class BluetoothService : Service() {
      * runs in the same process as its clients, we don't need to deal with IPC.
      */
     inner class BluetoothServiceBinder : Binder() {
-        fun getService(
-            bluetoothModel: BluetoothModel
-        ): BluetoothService {
-            this@BluetoothService.bluetoothModel = bluetoothModel
-
-            CoroutineScope(Dispatchers.IO).launch {
-                println("Initialising Bluetooth model now...")
-                bluetoothModel.initializeFromDataStore(
-                    {
-                        startSharePhoneInfo()
-                    }, applicationContext
-                )
-            }
-
+        fun getService(): BluetoothService {
             return this@BluetoothService
         }
     }
 
     override fun onBind(intent: Intent): IBinder {
+        return binder
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        println("Service started")
+
         telephonyManager =
             applicationContext.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
 
@@ -184,7 +177,16 @@ class BluetoothService : Service() {
 
         startForeground(1, notification)
 
-        return binder
+        CoroutineScope(Dispatchers.IO).launch {
+            println("Initialising Bluetooth model now...")
+            bluetoothModel.initializeFromDataStore(
+                {
+                    startSharePhoneInfo()
+                }, applicationContext
+            )
+        }
+
+        return START_STICKY
     }
 
     private fun startSharePhoneInfo() {

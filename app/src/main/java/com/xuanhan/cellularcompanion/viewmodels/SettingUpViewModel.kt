@@ -40,6 +40,7 @@ class SettingUpViewModel(private val context: Context) {
     suspend fun completeSetup() {
         bluetoothModel.markSetupComplete()
         val mainActivity = context.findActivity() as MainActivity
+        mainActivity.startService()
         mainActivity.connectService()
     }
 }
