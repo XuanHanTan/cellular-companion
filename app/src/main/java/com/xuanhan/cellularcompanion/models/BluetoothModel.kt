@@ -956,9 +956,9 @@ class BluetoothModel {
 
         if (wifiHotspotManager.isTetherActive) {
             wifiHotspotManager.stopTethering()
-        } else {
-            onTetheringStopped()
         }
+
+        onTetheringStopped()
     }
 
     /**

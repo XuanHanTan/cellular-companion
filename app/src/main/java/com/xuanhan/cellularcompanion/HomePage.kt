@@ -119,7 +119,6 @@ fun HomePage(navigator: DestinationsNavigator) {
                 ) {
                     if (connectStatus == ConnectStatus.Connecting) {
                         CircularProgressIndicator(
-                            modifier = Modifier.size(64.dp),
                             color = contentColor
                         )
                     } else {
