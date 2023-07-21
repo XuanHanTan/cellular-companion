@@ -7,19 +7,22 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 class HomePageViewModel {
-    private val _hotspotStatusMessage = MutableStateFlow("Disconnected")
-    val hotspotStatusMessage: StateFlow<String> = _hotspotStatusMessage.asStateFlow()
+    private val _connectStatus = MutableStateFlow(ConnectStatus.Disconnected)
+    val connectStatus: StateFlow<ConnectStatus> = _connectStatus.asStateFlow()
 
     init {
         bluetoothModel.registerForUIChanges(onConnectStatusUpdate = ::onConnectStatusUpdate)
     }
 
     private fun onConnectStatusUpdate(status: ConnectStatus) {
-        when (status) {
-            ConnectStatus.Disconnected -> _hotspotStatusMessage.value = "Disconnected"
-            ConnectStatus.Idle -> _hotspotStatusMessage.value = "Idle"
-            ConnectStatus.Connecting -> _hotspotStatusMessage.value = "Connecting"
-            ConnectStatus.Connected -> _hotspotStatusMessage.value = "Connected"
-        }
+        _connectStatus.value = status
+    }
+
+    fun enableHotspot() {
+        bluetoothModel.enableHotspot()
+    }
+
+    fun disableHotspot() {
+        bluetoothModel.disableHotspot()
     }
 }

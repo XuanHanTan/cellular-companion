@@ -429,28 +429,12 @@ class BluetoothModel {
                 when (text) {
                     NotificationType.EnableHotspot -> {
                         println("Enabling hotspot...")
-
-                        // Indicate that hotspot is connecting
-                        onConnectStatusUpdate?.invoke(ConnectStatus.Connecting)
-
-                        if (wifiHotspotManager.isTetherActive) {
-                            onTetheringStarted()
-                        } else {
-                            wifiHotspotManager.startTethering(myHotspotOnStartTetheringCallback)
-                        }
+                        enableHotspot()
                     }
 
                     NotificationType.DisableHotspot -> {
                         println("Disabling hotspot...")
-
-                        // Indicate that hotspot is disconnected
-                        onConnectStatusUpdate?.invoke(ConnectStatus.Idle)
-
-                        if (wifiHotspotManager.isTetherActive) {
-                            wifiHotspotManager.stopTethering()
-                        } else {
-                            onTetheringStopped()
-                        }
+                        disableHotspot()
                     }
 
                     else -> {
@@ -514,7 +498,8 @@ class BluetoothModel {
                     isConnectingToHotspot = true
 
                     connectHotspot2 = {
-                        commandCharacteristic!!.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+                        commandCharacteristic!!.writeType =
+                            BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
                         commandCharacteristic!!.value = CommandType.ConnectToHotspot.toByteArray()
                         gatt!!.writeCharacteristic(commandCharacteristic!!)
                     }
@@ -951,6 +936,28 @@ class BluetoothModel {
             startScan()
         } else {
             sharePhoneInfo2!!.invoke()
+        }
+    }
+
+    fun enableHotspot() {
+        // Indicate that hotspot is connecting
+        onConnectStatusUpdate?.invoke(ConnectStatus.Connecting)
+
+        if (wifiHotspotManager.isTetherActive) {
+            onTetheringStarted()
+        } else {
+            wifiHotspotManager.startTethering(myHotspotOnStartTetheringCallback)
+        }
+    }
+
+    fun disableHotspot() {
+        // Indicate that hotspot is disconnected
+        onConnectStatusUpdate?.invoke(ConnectStatus.Idle)
+
+        if (wifiHotspotManager.isTetherActive) {
+            wifiHotspotManager.stopTethering()
+        } else {
+            onTetheringStopped()
         }
     }
 

@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.ripple.LocalRippleTheme
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -35,6 +36,7 @@ import com.ramcosta.composedestinations.annotation.Destination
 import com.ramcosta.composedestinations.navigation.DestinationsNavigator
 import com.xuanhan.cellularcompanion.utilities.NoRippleTheme
 import com.xuanhan.cellularcompanion.viewmodels.HomePageViewModel
+import com.xuanhan.cellularcompanion.models.BluetoothModel.Companion.ConnectStatus
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
@@ -44,7 +46,7 @@ fun HomePage(navigator: DestinationsNavigator) {
     val viewModel = HomePageViewModel()
 
     val isPressed by interactionSource.collectIsPressedAsState()
-    val hotspotStatusMessage: String by viewModel.hotspotStatusMessage.collectAsState()
+    val connectStatus: ConnectStatus by viewModel.connectStatus.collectAsState()
 
     Scaffold {
         Column(
@@ -54,41 +56,79 @@ fun HomePage(navigator: DestinationsNavigator) {
                 .padding(0.dp, 32.dp, 0.dp, 48.dp)
                 .fillMaxWidth()
         ) {
-            Text(hotspotStatusMessage)
+            Text(
+                when (connectStatus) {
+                    ConnectStatus.Idle -> "Idle"
+                    ConnectStatus.Disconnected -> "Disconnected"
+                    ConnectStatus.Connecting -> "Connecting"
+                    ConnectStatus.Connected -> "Connected"
+                }
+            )
             Spacer(modifier = Modifier.weight(1f))
             CompositionLocalProvider(LocalRippleTheme provides NoRippleTheme) {
+                val borderColor = when (connectStatus) {
+                    ConnectStatus.Idle, ConnectStatus.Connecting, ConnectStatus.Disconnected -> if (isSystemInDarkTheme()) Color(
+                        0xFF505050
+                    ) else Color(0xFFD6D6D6)
+
+                    ConnectStatus.Connected -> if (isSystemInDarkTheme()) Color(0xFF5C8C54) else Color(
+                        0xFF8FD684
+                    )
+                }.copy(alpha = if (isPressed) 0.8f else 1f)
+                val containerColor = when (connectStatus) {
+                    ConnectStatus.Idle, ConnectStatus.Connecting, ConnectStatus.Disconnected -> if (isSystemInDarkTheme()) Color(
+                        0xFF313131
+                    ) else Color(0xFFF0F0F0)
+
+                    ConnectStatus.Connected -> if (isSystemInDarkTheme()) Color(0xFF292F28) else Color(
+                        0xFFDCF4D6
+                    )
+                }.copy(alpha = if (isPressed) 0.8f else 1f)
+                val contentColor = when (connectStatus) {
+                    ConnectStatus.Idle, ConnectStatus.Connecting, ConnectStatus.Disconnected -> Color(
+                        0xFF848484
+                    )
+
+                    ConnectStatus.Connected -> if (isSystemInDarkTheme()) Color(0xFF35D11B) else Color(
+                        0xFF1C850B
+                    )
+                }.copy(alpha = if (isPressed) 0.8f else 1f)
+
                 IconButton(
-                    onClick = { },
+                    onClick = {
+                        if (connectStatus == ConnectStatus.Idle) {
+                            viewModel.enableHotspot()
+                        } else {
+                            viewModel.disableHotspot()
+                        }
+                    },
                     modifier = Modifier
                         .size(200.dp)
                         .border(
                             4.dp,
-                            if (isSystemInDarkTheme())
-                                Color(0xFF5C8C54).copy(alpha = if (isPressed) 0.8f else 1f)
-                            else
-                                Color(0xFF8FD684).copy(alpha = if (isPressed) 0.8f else 1f),
+                            color = borderColor,
                             shape = CircleShape
                         )
                         .clip(CircleShape),
                     colors = IconButtonDefaults.filledIconButtonColors(
-                        containerColor =
-                        if (isSystemInDarkTheme())
-                            Color(0xFF292F28).copy(alpha = if (isPressed) 0.8f else 1f)
-                        else
-                            Color(0xFFDCF4D6).copy(alpha = if (isPressed) 0.8f else 1f),
-                        contentColor =
-                        if (isSystemInDarkTheme())
-                            Color(0xFF35D11B).copy(alpha = if (isPressed) 0.8f else 1f)
-                        else
-                            Color(0xFF1C850B).copy(alpha = if (isPressed) 0.8f else 1f),
+                        containerColor = containerColor,
+                        contentColor = contentColor,
                     ),
                     interactionSource = interactionSource,
-                    ) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.outline_wifi_tethering_24),
-                        contentDescription = "Enable hotspot",
-                        modifier = Modifier.size(64.dp)
-                    )
+                    enabled = connectStatus != ConnectStatus.Disconnected
+                ) {
+                    if (connectStatus == ConnectStatus.Connecting) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(64.dp),
+                            color = contentColor
+                        )
+                    } else {
+                        Icon(
+                            painter = painterResource(id = R.drawable.outline_wifi_tethering_24),
+                            contentDescription = "Enable hotspot",
+                            modifier = Modifier.size(64.dp)
+                        )
+                    }
                 }
             }
             Spacer(modifier = Modifier.weight(1f))
