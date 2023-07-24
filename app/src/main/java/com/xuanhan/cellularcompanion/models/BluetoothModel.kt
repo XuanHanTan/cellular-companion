@@ -99,6 +99,7 @@ class BluetoothModel {
         companion object {
             const val EnableHotspot = "0"
             const val DisableHotspot = "1"
+            const val IndicateConnectedHotspot = "2"
         }
     }
 
@@ -445,6 +446,11 @@ class BluetoothModel {
                         disableHotspot()
                     }
 
+                    NotificationType.IndicateConnectedHotspot -> {
+                        println("Indicating device connected to hotspot...")
+                        indicateConnectedHotspot()
+                    }
+
                     else -> {
                         println("Error: Received unknown payload from characteristic.")
                     }
@@ -580,16 +586,6 @@ class BluetoothModel {
         operationQueue.poll()?.let {
             isRunningOperation = true
 
-            // Reset indicators of commands
-            isFirstInitializing = false
-            isInitializing = false
-            initOnConnectCallback = null
-            isSharingHotspotDetails = false
-            isSharingPhoneInfo = false
-            isConnectingToHotspot = false
-            isDisconnectingFromHotspot = false
-            onHotspotDetailsSharedCallback = null
-
             it.invoke()
         }
     }
@@ -597,6 +593,17 @@ class BluetoothModel {
     @Synchronized
     private fun indicateOperationComplete() {
         isRunningOperation = false
+
+        // Reset indicators of commands
+        isFirstInitializing = false
+        isInitializing = false
+        initOnConnectCallback = null
+        isSharingHotspotDetails = false
+        isSharingPhoneInfo = false
+        isConnectingToHotspot = false
+        isDisconnectingFromHotspot = false
+        onHotspotDetailsSharedCallback = null
+
         doNextOperation()
     }
 
@@ -969,6 +976,10 @@ class BluetoothModel {
         if (!noBluetooth) {
             onTetheringStopped()
         }
+    }
+
+    fun indicateConnectedHotspot() {
+        onConnectStatusUpdates.forEach { it.invoke(ConnectStatus.Connected) }
     }
 
     /**
