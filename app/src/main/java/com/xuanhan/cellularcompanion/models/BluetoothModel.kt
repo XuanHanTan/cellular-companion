@@ -83,15 +83,13 @@ class BluetoothModel {
     private var isDisconnectingFromHotspot = false
     private var disconnectHotspot2: (() -> Unit)? = null
 
-    private var onScanFailedCallback: (() -> Unit)? = null
-    private var onUnexpectedErrorCallback: (() -> Unit)? = null
-    private var onConnectFailedCallback: (() -> Unit)? = null
-    private var onBondFailedCallback: (() -> Unit)? = null
-    private var onHotspotDetailsShareFailedCallback: (() -> Unit)? = null
-    val onErrorDismissedCallback = {
-        reset()
-        initialize(context)
-    }
+    private var onScanFailedCallback: ((() -> Unit) -> Unit)? = null
+    private var onUnexpectedErrorCallback: ((() -> Unit) -> Unit)? = null
+    private var onConnectFailedCallback: ((() -> Unit) -> Unit)? = null
+    private var onBondFailedCallback: ((() -> Unit) -> Unit)? = null
+    private var onHotspotDetailsShareFailedCallback: ((() -> Unit) -> Unit)? = null
+
+    private var hotspotDetailsRetryCallback: (() -> Unit)? = null
 
     private var onConnectStatusUpdates: ArrayList<((status: ConnectStatus) -> Unit)> = arrayListOf()
 
@@ -162,12 +160,18 @@ class BluetoothModel {
             super.onScanFailed(errorCode)
             when (errorCode) {
                 SCAN_FAILED_APPLICATION_REGISTRATION_FAILED -> {
-                    onScanFailedCallback?.invoke()
+                    onScanFailedCallback?.invoke {
+                        reset()
+                        initialize(context)
+                    }
                     println("Scan failed: restart Bluetooth and press Retry")
                 }
 
                 else -> {
-                    onScanFailedCallback?.invoke()
+                    onScanFailedCallback?.invoke {
+                        reset()
+                        initialize(context)
+                    }
                     println("Scan failed with error code $errorCode")
                 }
             }
@@ -242,7 +246,10 @@ class BluetoothModel {
                     } else {
                         // Run connect failed callback only during setup
                         if (isFirstInitializing) {
-                            onConnectFailedCallback?.invoke()
+                            onConnectFailedCallback?.invoke {
+                                reset()
+                                initialize(context)
+                            }
                         }
 
                         // Start scan for devices again
@@ -292,11 +299,17 @@ class BluetoothModel {
                     // Request for a larger maximum transmission unit (MTU) size
                     gatt.requestMtu(517)
                 } else {
-                    onUnexpectedErrorCallback?.invoke()
+                    onUnexpectedErrorCallback?.invoke {
+                        reset()
+                        initialize(context)
+                    }
                     println("Could not find service.")
                 }
             } else {
-                onUnexpectedErrorCallback?.invoke()
+                onUnexpectedErrorCallback?.invoke {
+                    reset()
+                    initialize(context)
+                }
                 println("Service discovery failed due to internal error: $status")
             }
         }
@@ -352,7 +365,10 @@ class BluetoothModel {
                 // Subscribe to notifications on the notification characteristic
                 enableNotifications()
             } else {
-                onUnexpectedErrorCallback?.invoke()
+                onUnexpectedErrorCallback?.invoke {
+                    reset()
+                    initialize(context)
+                }
                 println("Error: MTU change failed with status $status")
             }
         }
@@ -409,7 +425,13 @@ class BluetoothModel {
                 println("Error: Failed to write to characteristic ${characteristic!!.uuid} with status $status")
 
                 if (isFirstInitializing) {
-                    onConnectFailedCallback?.invoke()
+                    val initOnConnectCallback = initOnConnectCallback
+                    onConnectFailedCallback?.invoke {
+                        reset()
+                        isFirstInitializing = true
+                        this@BluetoothModel.initOnConnectCallback = initOnConnectCallback
+                        initialize(context)
+                    }
                 } else if (isSharingHotspotDetails) {
                     if (hotspotShareRetryCount < 5) {
                         // Retry sharing hotspot details to device
@@ -417,7 +439,9 @@ class BluetoothModel {
                         hotspotShareRetryCount++
                     } else {
                         // Show error message
-                        onHotspotDetailsShareFailedCallback?.invoke()
+                        hotspotDetailsRetryCallback?.let {
+                            onHotspotDetailsShareFailedCallback?.invoke(it)
+                        }
                     }
                 } else {
                     indicateOperationComplete()
@@ -467,7 +491,13 @@ class BluetoothModel {
     fun onBondingFailed() {
         println("Error: Failed to bond to device ${connectDevice!!.address}")
 
-        onBondFailedCallback?.invoke()
+        val initOnConnectCallback = initOnConnectCallback
+        onBondFailedCallback?.invoke {
+            reset()
+            isFirstInitializing = true
+            this@BluetoothModel.initOnConnectCallback = initOnConnectCallback
+            initialize(context)
+        }
     }
 
     private val myHotspotOnStartTetheringCallback = object : HotspotOnStartTetheringCallback() {
@@ -890,6 +920,11 @@ class BluetoothModel {
             gatt!!.writeCharacteristic(commandCharacteristic!!)
         }
 
+        hotspotDetailsRetryCallback = {
+            reset()
+            startShareHotspotDetails(ssid, password, onHotspotDetailsSharedCallback)
+        }
+
         if (bluetoothManager.getConnectedDevices(BluetoothProfile.GATT)
                 .find { it.address == connectDevice?.address } == null
         ) {
@@ -990,11 +1025,11 @@ class BluetoothModel {
      * @param onConnectFailedCallback The callback function to be called when connecting to a device fails.
      * */
     fun registerForErrorHandling(
-        onScanFailedCallback: () -> Unit,
-        onUnexpectedErrorCallback: () -> Unit,
-        onConnectFailedCallback: () -> Unit,
-        onBondFailedCallback: () -> Unit,
-        onHotspotDetailsShareFailedCallback: () -> Unit,
+        onScanFailedCallback: (() -> Unit) -> Unit,
+        onUnexpectedErrorCallback: (() -> Unit) -> Unit,
+        onHotspotDetailsShareFailedCallback: (() -> Unit) -> Unit,
+        onConnectFailedCallback: (() -> Unit) -> Unit,
+        onBondFailedCallback: (() -> Unit) -> Unit
     ) {
         this.onScanFailedCallback = onScanFailedCallback
         this.onUnexpectedErrorCallback = onUnexpectedErrorCallback

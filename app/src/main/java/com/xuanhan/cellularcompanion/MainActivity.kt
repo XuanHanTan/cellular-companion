@@ -101,7 +101,7 @@ class MainActivity : ComponentActivity() {
 
     internal fun startService() {
         Intent(this, BluetoothService::class.java).also { intent ->
-            startService(intent)
+            startForegroundService(intent)
         }
     }
 

@@ -37,7 +37,7 @@ fun HotspotInfo(navigator: DestinationsNavigator) {
     var ssid by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
 
-    // TODO: ensure that wifi password is in ASCII and does not contain "
+    // TODO: ensure that wifi ssid/password is in ASCII and does not contain "
 
     Scaffold(topBar = {
         LargeTopAppBar(

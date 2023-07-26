@@ -22,6 +22,7 @@ import android.telephony.TelephonyManager
 import androidx.annotation.RequiresApi
 import androidx.core.app.ActivityCompat
 import com.xuanhan.cellularcompanion.MainActivity
+import com.xuanhan.cellularcompanion.R
 import com.xuanhan.cellularcompanion.bluetoothModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -74,6 +75,7 @@ class BluetoothService : Service() {
                 handleNetworkTypeChanged(p0.networkType)
             }
         }
+    var started = false
 
     private fun handleSignalStrengthLevelChanged(signalStrengthLevel: Int) {
         val modifiedSignalStrengthLevel =
@@ -147,43 +149,48 @@ class BluetoothService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        println("Service started")
+        if (!started) {
+            println("Service started")
 
-        telephonyManager =
-            applicationContext.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
+            telephonyManager =
+                applicationContext.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
 
-        val name = "Bluetooth Service"
-        val descriptionText =
-            "Allows Cellular Companion to communicate with your Mac in the background."
-        val importance = NotificationManager.IMPORTANCE_LOW
-        val mChannel = NotificationChannel("bluetooth_service", name, importance)
-        mChannel.description = descriptionText
-        val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-        notificationManager.createNotificationChannel(mChannel)
+            val name = "Bluetooth Service"
+            val descriptionText =
+                "Allows Cellular Companion to communicate with your Mac in the background."
+            val importance = NotificationManager.IMPORTANCE_LOW
+            val mChannel = NotificationChannel("bluetooth_service", name, importance)
+            mChannel.description = descriptionText
+            val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.createNotificationChannel(mChannel)
 
-        val pendingIntent: PendingIntent =
-            Intent(this, MainActivity::class.java).let { notificationIntent ->
-                PendingIntent.getActivity(
-                    this, 0, notificationIntent,
-                    PendingIntent.FLAG_IMMUTABLE
+            val pendingIntent: PendingIntent =
+                Intent(this, MainActivity::class.java).let { notificationIntent ->
+                    PendingIntent.getActivity(
+                        this, 0, notificationIntent,
+                        PendingIntent.FLAG_IMMUTABLE
+                    )
+                }
+
+            val notification: Notification = Notification.Builder(this, "bluetooth_service")
+                .setContentTitle("Cellular Companion")
+                .setContentText("The Bluetooth service is running. Tap to view details.")
+                .setContentIntent(pendingIntent)
+                .setSmallIcon(R.mipmap.ic_launcher_round)
+                .build()
+
+            startForeground(1, notification)
+
+            CoroutineScope(Dispatchers.IO).launch {
+                println("Initialising Bluetooth model now...")
+                bluetoothModel.initializeFromDataStore(
+                    {
+                        startSharePhoneInfo()
+                    }, applicationContext
                 )
             }
 
-        val notification: Notification = Notification.Builder(this, "bluetooth_service")
-            .setContentTitle("Cellular Companion")
-            .setContentText("The Bluetooth service is running. Tap to view details")
-            .setContentIntent(pendingIntent)
-            .build()
-
-        startForeground(1, notification)
-
-        CoroutineScope(Dispatchers.IO).launch {
-            println("Initialising Bluetooth model now...")
-            bluetoothModel.initializeFromDataStore(
-                {
-                    startSharePhoneInfo()
-                }, applicationContext
-            )
+            started = true
         }
 
         return START_STICKY

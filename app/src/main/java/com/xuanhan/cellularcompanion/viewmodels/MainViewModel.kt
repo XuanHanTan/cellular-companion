@@ -12,18 +12,23 @@ import kotlinx.coroutines.flow.asStateFlow
 class MainViewModel {
     private val _isShowingScanFailedDialog = MutableStateFlow(false)
     val isShowingScanFailedDialog: StateFlow<Boolean> = _isShowingScanFailedDialog.asStateFlow()
+    private lateinit var retryScanFailedDialogCallback: () -> Unit
     private val _isShowingUnexpectedErrorDialog = MutableStateFlow(false)
     val isShowingUnexpectedErrorDialog: StateFlow<Boolean> =
         _isShowingUnexpectedErrorDialog.asStateFlow()
+    private lateinit var retryUnexpectedErrorDialogCallback: () -> Unit
     private val _isShowingHotspotDetailsShareFailedDialog = MutableStateFlow(false)
     val isShowingHotspotDetailsShareFailedDialog: StateFlow<Boolean> =
         _isShowingHotspotDetailsShareFailedDialog.asStateFlow()
+    private lateinit var retryHotspotDetailsShareFailedDialogCallback: () -> Unit
     private val _isShowingConnectFailedDialog = MutableStateFlow(false)
     val isShowingConnectFailedDialog: StateFlow<Boolean> =
         _isShowingConnectFailedDialog.asStateFlow()
+    private lateinit var retryConnectFailedDialogCallback: () -> Unit
     private val _isShowingBondFailedDialog = MutableStateFlow(false)
     val isShowingBondFailedDialog: StateFlow<Boolean> =
         _isShowingBondFailedDialog.asStateFlow()
+    private lateinit var retryBondFailedDialogCallback: () -> Unit
     private val _isBluetoothEnabled = MutableStateFlow(true)
     val isBluetoothEnabled: StateFlow<Boolean> =
         _isBluetoothEnabled.asStateFlow()
@@ -43,49 +48,54 @@ class MainViewModel {
         bluetoothModel.registerForUIChanges(onConnectStatusUpdate = ::onConnectStatusUpdate)
     }
 
-    private fun showScanFailedDialog() {
+    private fun showScanFailedDialog(retryCallback: () -> Unit) {
         _isShowingScanFailedDialog.value = true
+        retryScanFailedDialogCallback = retryCallback
     }
 
     fun confirmScanFailedDialog() {
         _isShowingScanFailedDialog.value = false
-        bluetoothModel.onErrorDismissedCallback()
+        retryScanFailedDialogCallback()
     }
 
-    private fun showUnexpectedErrorDialog() {
+    private fun showUnexpectedErrorDialog(retryCallback: () -> Unit) {
         _isShowingUnexpectedErrorDialog.value = true
+        retryUnexpectedErrorDialogCallback = retryCallback
     }
 
     fun confirmUnexpectedErrorDialog() {
         _isShowingUnexpectedErrorDialog.value = false
-        bluetoothModel.onErrorDismissedCallback()
+        retryUnexpectedErrorDialogCallback()
     }
 
-    private fun showHotspotDetailsShareFailedDialog() {
+    private fun showHotspotDetailsShareFailedDialog(retryCallback: () -> Unit) {
         _isShowingHotspotDetailsShareFailedDialog.value = true
+        retryHotspotDetailsShareFailedDialogCallback = retryCallback
     }
 
     fun confirmHotspotDetailsShareFailedDialog() {
         _isShowingHotspotDetailsShareFailedDialog.value = false
-        bluetoothModel.onErrorDismissedCallback()
+        retryHotspotDetailsShareFailedDialogCallback()
     }
 
-    private fun showConnectFailedDialog() {
+    private fun showConnectFailedDialog(retryCallback: () -> Unit) {
         _isShowingConnectFailedDialog.value = true
+        retryConnectFailedDialogCallback = retryCallback
     }
 
     fun confirmConnectFailedDialog() {
         _isShowingConnectFailedDialog.value = false
-        bluetoothModel.onErrorDismissedCallback()
+        retryConnectFailedDialogCallback()
     }
 
-    private fun showBondFailedDialog() {
+    private fun showBondFailedDialog(retryCallback: () -> Unit) {
         _isShowingBondFailedDialog.value = true
+        retryBondFailedDialogCallback = retryCallback
     }
 
     fun confirmBondFailedDialog() {
         _isShowingBondFailedDialog.value = false
-        bluetoothModel.onErrorDismissedCallback()
+        retryBondFailedDialogCallback()
     }
 
     fun setBluetoothEnabled(context: Context): Boolean {
