@@ -31,6 +31,9 @@ import com.xuanhan.cellularcompanion.isSetupCompleteKey
 import com.xuanhan.cellularcompanion.utilities.AES
 import com.xuanhan.cellularcompanion.utilities.HotspotOnStartTetheringCallback
 import com.xuanhan.cellularcompanion.utilities.WifiHotspotManager
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import java.util.Timer
@@ -91,7 +94,8 @@ class BluetoothModel {
 
     private var hotspotDetailsRetryCallback: (() -> Unit)? = null
 
-    private var onConnectStatusUpdates: ArrayList<((status: ConnectStatus) -> Unit)> = arrayListOf()
+    private val _connectStatus: MutableStateFlow<ConnectStatus> = MutableStateFlow(ConnectStatus.Disconnected)
+    val connectStatus: StateFlow<ConnectStatus> = _connectStatus.asStateFlow()
 
     class NotificationType {
         companion object {
@@ -224,7 +228,7 @@ class BluetoothModel {
                         }
 
                         // Set connect status to disconnected
-                        onConnectStatusUpdates.forEach { it.invoke(ConnectStatus.Disconnected) }
+                        _connectStatus.value = ConnectStatus.Disconnected
 
                         // Start scan for devices if disconnected due to issues such as out of range, device powered off etc.
                         startScan()
@@ -390,12 +394,12 @@ class BluetoothModel {
                 }
 
                 // Indicate that device is connected
-                onConnectStatusUpdates.forEach { it.invoke(ConnectStatus.Idle) }
+                _connectStatus.value = ConnectStatus.Idle
             } else {
                 println("Error: Failed to write to descriptor of characteristic ${descriptor!!.characteristic.uuid} with status $status")
                 if (!isDisconnecting) {
                     // Indicate that device is disconnected
-                    onConnectStatusUpdates.forEach { it.invoke(ConnectStatus.Disconnected) }
+                    _connectStatus.value = ConnectStatus.Disconnected
                 }
             }
         }
@@ -417,7 +421,7 @@ class BluetoothModel {
                     onHotspotDetailsSharedCallback?.invoke()
                 } else if (isConnectingToHotspot) {
                     // Indicate that hotspot is connected
-                    onConnectStatusUpdates.forEach { it.invoke(ConnectStatus.Connected) }
+                    _connectStatus.value = ConnectStatus.Connected
                 }
 
                 indicateOperationComplete()
@@ -991,7 +995,7 @@ class BluetoothModel {
 
     fun enableHotspot() {
         // Indicate that hotspot is connecting
-        onConnectStatusUpdates.forEach { it.invoke(ConnectStatus.Connecting) }
+        _connectStatus.value = ConnectStatus.Connecting
 
         if (wifiHotspotManager.isTetherActive) {
             onTetheringStarted()
@@ -1002,7 +1006,7 @@ class BluetoothModel {
 
     fun disableHotspot(noBluetooth: Boolean = false) {
         // Indicate that hotspot is disconnected
-        onConnectStatusUpdates.forEach { it.invoke(ConnectStatus.Idle) }
+        _connectStatus.value = ConnectStatus.Idle
 
         if (wifiHotspotManager.isTetherActive) {
             wifiHotspotManager.stopTethering()
@@ -1014,7 +1018,7 @@ class BluetoothModel {
     }
 
     fun indicateConnectedHotspot() {
-        onConnectStatusUpdates.forEach { it.invoke(ConnectStatus.Connected) }
+        _connectStatus.value = ConnectStatus.Connected
     }
 
     /**
@@ -1036,12 +1040,6 @@ class BluetoothModel {
         this.onConnectFailedCallback = onConnectFailedCallback
         this.onBondFailedCallback = onBondFailedCallback
         this.onHotspotDetailsShareFailedCallback = onHotspotDetailsShareFailedCallback
-    }
-
-    fun registerForUIChanges(
-        onConnectStatusUpdate: (status: ConnectStatus) -> Unit
-    ) {
-        this.onConnectStatusUpdates.add(onConnectStatusUpdate)
     }
 
     /**

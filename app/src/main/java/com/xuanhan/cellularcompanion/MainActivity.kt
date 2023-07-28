@@ -88,13 +88,15 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
 
-        CoroutineScope(Dispatchers.Main.immediate).launch {
+        CoroutineScope(Dispatchers.IO).launch {
             isSetupComplete = this@MainActivity.dataStore.data.map { settings ->
                 settings[isSetupCompleteKey] ?: false
             }.first()
-            if (isSetupComplete) {
-                startService()
-                connectService()
+            CoroutineScope(Dispatchers.Main).launch {
+                if (isSetupComplete) {
+                    startService()
+                    connectService()
+                }
             }
         }
     }

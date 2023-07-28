@@ -46,7 +46,7 @@ fun HomePage(navigator: DestinationsNavigator) {
     val viewModel = HomePageViewModel()
 
     val isPressed by interactionSource.collectIsPressedAsState()
-    val connectStatus: ConnectStatus by viewModel.connectStatus.collectAsState()
+    val connectStatus by bluetoothModel.connectStatus.collectAsState()
 
     Scaffold {
         Column(
