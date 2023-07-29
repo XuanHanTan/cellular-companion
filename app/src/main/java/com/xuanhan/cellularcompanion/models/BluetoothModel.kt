@@ -31,11 +31,14 @@ import com.xuanhan.cellularcompanion.isSetupCompleteKey
 import com.xuanhan.cellularcompanion.utilities.AES
 import com.xuanhan.cellularcompanion.utilities.HotspotOnStartTetheringCallback
 import com.xuanhan.cellularcompanion.utilities.WifiHotspotManager
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import java.util.Timer
 import java.util.TimerTask
 import java.util.UUID
@@ -52,6 +55,7 @@ class BluetoothModel {
     private var isRunningOperation = false
     private val serviceUUIDKey = stringPreferencesKey("serviceUUID")
     private val sharedKeyKey = stringPreferencesKey("sharedKey")
+    private val deviceAddressKey = stringPreferencesKey("deviceAddress")
 
     private lateinit var bluetoothManager: BluetoothManager
     private lateinit var context: Context
@@ -63,6 +67,7 @@ class BluetoothModel {
 
     private var serviceUUID: String? = null
     private var sharedKey: String? = null
+    private var deviceAddress: String? = null
     private var connectDevice: BluetoothDevice? = null
     private var gatt: BluetoothGatt? = null
     private var commandCharacteristic: BluetoothGattCharacteristic? = null
@@ -101,7 +106,8 @@ class BluetoothModel {
     class NotificationType {
         companion object {
             const val EnableHotspot = "0"
-            const val DisableHotspot = "1"
+            const val DisableHotspot = "1 0"
+            const val DisableHotspotIndicateOnly = "1 1"
             const val IndicateConnectedHotspot = "2"
         }
     }
@@ -152,6 +158,12 @@ class BluetoothModel {
 
                     println("Found Bluetooth device: ${result.scanRecord?.serviceUuids} $name $address")
                     println("Now attempting to connect to Bluetooth device.")
+
+                    val address = result.device.address
+                    if (!isFirstInitializing && address != deviceAddress) {
+                        println("Error: Device address does not match paired device address.")
+                        return
+                    }
 
                     // Connect to the device
                     isConnecting = true
@@ -223,11 +235,6 @@ class BluetoothModel {
                     gatt.discoverServices()
                 } else {
                     if (isSetupComplete) {
-                        // Turn off hotspot if needed
-                        if (wifiHotspotManager.isTetherActive) {
-                            disableHotspot(noBluetooth = true)
-                        }
-
                         // Set connect status to disconnected
                         _connectStatus.value = ConnectStatus.Disconnected
 
@@ -417,6 +424,15 @@ class BluetoothModel {
 
                 // Run the next operation
                 if (isFirstInitializing) {
+                    // Store device address
+                    deviceAddress = connectDevice!!.address
+                    CoroutineScope(Dispatchers.IO).launch {
+                        context.dataStore.edit { settings ->
+                            settings[deviceAddressKey] = deviceAddress!!
+                        }
+                    }
+
+                    // Indicate that initialization is complete
                     initOnConnectCallback?.invoke()
                 } else if (isSharingHotspotDetails) {
                     onHotspotDetailsSharedCallback?.invoke()
@@ -473,6 +489,11 @@ class BluetoothModel {
                     NotificationType.DisableHotspot -> {
                         println("Disabling hotspot...")
                         disableHotspot()
+                    }
+
+                    NotificationType.DisableHotspotIndicateOnly -> {
+                        println("Disabling hotspot (no bluetooth)...")
+                        disableHotspot(noBluetooth = true)
                     }
 
                     NotificationType.IndicateConnectedHotspot -> {
@@ -695,6 +716,9 @@ class BluetoothModel {
         sharedKey = context.dataStore.data.map { settings ->
             settings[sharedKeyKey] ?: ""
         }.first()
+        deviceAddress = context.dataStore.data.map { settings ->
+            settings[deviceAddressKey] ?: ""
+        }.first()
         isSetupComplete = context.dataStore.data.map { settings ->
             settings[isSetupCompleteKey] ?: false
         }.first()
@@ -706,6 +730,11 @@ class BluetoothModel {
 
         if (sharedKey == "") {
             println("Error: Shared Key not found in DataStore.")
+            return
+        }
+
+        if (deviceAddress == "") {
+            println("Error: Device Address not found in DataStore.")
             return
         }
 
@@ -1011,6 +1040,7 @@ class BluetoothModel {
         // Indicate that hotspot is disconnected
         _connectStatus.value = ConnectStatus.Idle
 
+        // TODO: check that hotspot was started by us first
         if (wifiHotspotManager.isTetherActive) {
             wifiHotspotManager.stopTethering()
         }
