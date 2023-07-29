@@ -31,7 +31,6 @@ import java.util.Timer
 import java.util.TimerTask
 import kotlin.math.floor
 
-// TODO: Make service start on boot
 class BluetoothService : Service() {
     private val binder = BluetoothServiceBinder()
     private val batteryLevelTimer = Timer()

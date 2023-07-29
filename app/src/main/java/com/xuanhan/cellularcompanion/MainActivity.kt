@@ -152,6 +152,7 @@ class MainActivity : ComponentActivity() {
                     val showHotspotDetailsShareFailedDialogState: Boolean by viewModel.isShowingHotspotDetailsShareFailedDialog.collectAsState()
                     val showConnectFailedDialogState: Boolean by viewModel.isShowingConnectFailedDialog.collectAsState()
                     val showBondFailedDialogState: Boolean by viewModel.isShowingBondFailedDialog.collectAsState()
+                    val showHotspotFailedDialogState: Boolean by viewModel.isShowingHotspotFailedDialog.collectAsState()
                     val isBluetoothEnabled: Boolean by viewModel.isBluetoothEnabled.collectAsState()
 
                     if (showScanFailedDialogState)
@@ -164,6 +165,8 @@ class MainActivity : ComponentActivity() {
                         ConnectFailedDialog()
                     if (showBondFailedDialogState)
                         BondFailedDialog()
+                    if (showHotspotFailedDialogState)
+                        HotspotFailedDialog()
                     if (!isBluetoothEnabled)
                         EnableBluetoothDialog()
 
@@ -284,6 +287,27 @@ class MainActivity : ComponentActivity() {
             },
             text = {
                 Text(text = "Ensure that your Mac remains close to this device and try again.")
+            }
+        )
+    }
+
+    @Composable
+    fun HotspotFailedDialog() {
+        AlertDialog(
+            onDismissRequest = {},
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.confirmHotspotFailedDialog()
+                }) {
+                    Text(text = "Retry")
+                }
+            },
+            dismissButton = {},
+            title = {
+                Text(text = "Failed to enable hotspot")
+            },
+            text = {
+                Text(text = "An unexpected error has occurred. Please try again.")
             }
         )
     }

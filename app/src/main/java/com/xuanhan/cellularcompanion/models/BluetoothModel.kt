@@ -91,6 +91,7 @@ class BluetoothModel {
     private var onConnectFailedCallback: ((() -> Unit) -> Unit)? = null
     private var onBondFailedCallback: ((() -> Unit) -> Unit)? = null
     private var onHotspotDetailsShareFailedCallback: ((() -> Unit) -> Unit)? = null
+    private var onHotspotFailedCallback: ((() -> Unit) -> Unit)? = null
 
     private var hotspotDetailsRetryCallback: (() -> Unit)? = null
 
@@ -511,7 +512,9 @@ class BluetoothModel {
 
         override fun onTetheringFailed() {
             println("Hotspot failed to start")
-            // TODO: handle hotspot failed to start
+            onHotspotFailedCallback?.invoke {
+                enableHotspot()
+            }
         }
     }
 
@@ -1033,13 +1036,15 @@ class BluetoothModel {
         onUnexpectedErrorCallback: (() -> Unit) -> Unit,
         onHotspotDetailsShareFailedCallback: (() -> Unit) -> Unit,
         onConnectFailedCallback: (() -> Unit) -> Unit,
-        onBondFailedCallback: (() -> Unit) -> Unit
+        onBondFailedCallback: (() -> Unit) -> Unit,
+        onHotspotFailedCallback: (() -> Unit) -> Unit
     ) {
         this.onScanFailedCallback = onScanFailedCallback
         this.onUnexpectedErrorCallback = onUnexpectedErrorCallback
         this.onConnectFailedCallback = onConnectFailedCallback
         this.onBondFailedCallback = onBondFailedCallback
         this.onHotspotDetailsShareFailedCallback = onHotspotDetailsShareFailedCallback
+        this.onHotspotFailedCallback = onHotspotFailedCallback
     }
 
     /**
