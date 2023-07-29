@@ -13,6 +13,8 @@ import java.lang.reflect.Method
 class WifiHotspotManager(private val mContext: Context) {
     private val mConnectivityManager: ConnectivityManager = mContext.getSystemService(ConnectivityManager::class.java) as ConnectivityManager
 
+    var isHotspotStartedByUs = false
+        private set
     val isTetherActive: Boolean
         /**
          * Checks where tethering is on.
@@ -87,6 +89,7 @@ class WifiHotspotManager(private val mContext: Context) {
                 )
                 Log.d(TAG, "startTethering invoked")
             }
+            isHotspotStartedByUs = true
             return true
         } catch (e: Exception) {
             Log.e(TAG, "Error in enableTethering")
@@ -102,6 +105,7 @@ class WifiHotspotManager(private val mContext: Context) {
                 Int::class.javaPrimitiveType
             )
             method.invoke(mConnectivityManager, ConnectivityManager.TYPE_MOBILE)
+            isHotspotStartedByUs = false
             Log.d(TAG, "stopTethering invoked")
         } catch (e: Exception) {
             Log.e(TAG, "stopTethering error: $e")

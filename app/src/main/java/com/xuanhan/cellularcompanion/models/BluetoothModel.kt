@@ -1040,8 +1040,8 @@ class BluetoothModel {
         // Indicate that hotspot is disconnected
         _connectStatus.value = ConnectStatus.Idle
 
-        // TODO: check that hotspot was started by us first
-        if (wifiHotspotManager.isTetherActive) {
+        // Disconnect from hotspot
+        if (wifiHotspotManager.isHotspotStartedByUs && wifiHotspotManager.isTetherActive) {
             wifiHotspotManager.stopTethering()
         }
 
