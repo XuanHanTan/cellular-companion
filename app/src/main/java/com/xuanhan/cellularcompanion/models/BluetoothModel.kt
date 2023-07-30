@@ -102,6 +102,8 @@ class BluetoothModel {
 
     private val _connectStatus: MutableStateFlow<ConnectStatus> = MutableStateFlow(ConnectStatus.Disconnected)
     val connectStatus: StateFlow<ConnectStatus> = _connectStatus.asStateFlow()
+    private val _isSeePhoneInfoEnabled: MutableStateFlow<Boolean> = MutableStateFlow(false)
+    val isSeePhoneInfoEnabled: StateFlow<Boolean> = _isSeePhoneInfoEnabled.asStateFlow()
 
     class NotificationType {
         companion object {
@@ -109,6 +111,8 @@ class BluetoothModel {
             const val DisableHotspot = "1 0"
             const val DisableHotspotIndicateOnly = "1 1"
             const val IndicateConnectedHotspot = "2"
+            const val EnableSeePhoneInfo = "3"
+            const val DisableSeePhoneInfo = "4"
         }
     }
 
@@ -237,6 +241,9 @@ class BluetoothModel {
                     if (isSetupComplete) {
                         // Set connect status to disconnected
                         _connectStatus.value = ConnectStatus.Disconnected
+
+                        // Disable see phone info
+                        _isSeePhoneInfoEnabled.value = false
 
                         // Start scan for devices if disconnected due to issues such as out of range, device powered off etc.
                         startScan()
@@ -499,6 +506,16 @@ class BluetoothModel {
                     NotificationType.IndicateConnectedHotspot -> {
                         println("Indicating device connected to hotspot...")
                         indicateConnectedHotspot()
+                    }
+
+                    NotificationType.EnableSeePhoneInfo -> {
+                        println("Enabling see phone info...")
+                        _isSeePhoneInfoEnabled.value = true
+                    }
+
+                    NotificationType.DisableSeePhoneInfo -> {
+                        println("Disabling see phone info...")
+                        _isSeePhoneInfoEnabled.value = false
                     }
 
                     else -> {

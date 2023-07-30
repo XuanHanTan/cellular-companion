@@ -24,6 +24,7 @@ import androidx.core.app.ActivityCompat
 import com.xuanhan.cellularcompanion.MainActivity
 import com.xuanhan.cellularcompanion.R
 import com.xuanhan.cellularcompanion.bluetoothModel
+import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -74,7 +75,8 @@ class BluetoothService : Service() {
                 handleNetworkTypeChanged(p0.networkType)
             }
         }
-    var started = false
+    private var started = false
+    private var isSeePhoneInfoEnabled = false
 
     private fun handleSignalStrengthLevelChanged(signalStrengthLevel: Int) {
         val modifiedSignalStrengthLevel =
@@ -123,11 +125,13 @@ class BluetoothService : Service() {
         prevNetworkType = networkTypeString
     }
 
-    private fun handleBatteryPercentageChanged(batteryPercentage: Int) {
-        if (batteryPercentage != prevBatteryPercentage && ((batteryPercentage + 12) % 25 == 0 || prevBatteryPercentage == -1)) {
-            val roundedPercentage = Math.floorDiv(batteryPercentage + 12, 25) * 25
-            println("Updating battery level $roundedPercentage")
-            bluetoothModel.sharePhoneInfo(-1, "-1", roundedPercentage)
+    private fun handleBatteryPercentageChanged(batteryPercentage: Int, immediate: Boolean) {
+        if (isSeePhoneInfoEnabled) {
+            if ((batteryPercentage != prevBatteryPercentage && ((batteryPercentage + 12) % 25 == 0 || prevBatteryPercentage == -1)) || immediate) {
+                val roundedPercentage = Math.floorDiv(batteryPercentage + 12, 25) * 25
+                println("Updating battery level $roundedPercentage")
+                bluetoothModel.sharePhoneInfo(-1, "-1", roundedPercentage)
+            }
         }
 
         prevBatteryPercentage = batteryPercentage
@@ -184,15 +188,49 @@ class BluetoothService : Service() {
                 println("Initialising Bluetooth model now...")
                 bluetoothModel.initializeFromDataStore(
                     {
-                        startSharePhoneInfo()
+                        batteryLevelTimer.scheduleAtFixedRate(object : TimerTask() {
+                            override fun run() {
+                                getBatteryPercentage()
+                            }
+                        }, 0, 300000)
+
+                        if (isSeePhoneInfoEnabled) {
+                            startSharePhoneInfo()
+                        }
                     }, applicationContext
                 )
+            }
+
+            CoroutineScope(Dispatchers.IO + CoroutineName("SeePhoneInfo")).launch {
+                bluetoothModel.isSeePhoneInfoEnabled.collect {
+                    isSeePhoneInfoEnabled = it
+
+                    if (isSeePhoneInfoEnabled) {
+                        startSharePhoneInfo()
+                        getBatteryPercentage(immediate = true)
+                    } else {
+                        disposePhoneStateListeners()
+                    }
+                }
             }
 
             started = true
         }
 
         return START_STICKY
+    }
+
+    private fun getBatteryPercentage(immediate: Boolean = false) {
+        val batteryStatus: Intent? = IntentFilter(Intent.ACTION_BATTERY_CHANGED).let {
+            applicationContext.registerReceiver(null, it)
+        }
+        val batteryPct: Int? = batteryStatus?.let { intent ->
+            val level: Int = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+            val scale: Int = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
+            (level * 100 / scale.toFloat()).toInt()
+        }
+        println("Battery percentage $batteryPct")
+        handleBatteryPercentageChanged(batteryPct ?: 100, immediate)
     }
 
     private fun startSharePhoneInfo() {
@@ -207,26 +245,9 @@ class BluetoothService : Service() {
                 PhoneStateListener.LISTEN_SIGNAL_STRENGTHS
             )
         }
-
-        batteryLevelTimer.scheduleAtFixedRate(object : TimerTask() {
-            override fun run() {
-                val batteryStatus: Intent? = IntentFilter(Intent.ACTION_BATTERY_CHANGED).let {
-                    applicationContext.registerReceiver(null, it)
-                }
-                val batteryPct: Int? = batteryStatus?.let { intent ->
-                    val level: Int = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
-                    val scale: Int = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
-                    (level * 100 / scale.toFloat()).toInt()
-                }
-                println("Battery percentage $batteryPct")
-                handleBatteryPercentageChanged(batteryPct ?: 100)
-            }
-        }, 0, 300000)
     }
 
-    override fun onUnbind(intent: Intent?): Boolean {
-        batteryLevelTimer.cancel()
-
+    private fun disposePhoneStateListeners() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             telephonyManager.unregisterTelephonyCallback(telephonyCallback as TelephonyCallback)
         } else {
@@ -235,6 +256,11 @@ class BluetoothService : Service() {
                 PhoneStateListener.LISTEN_NONE
             )
         }
+    }
+
+    override fun onUnbind(intent: Intent?): Boolean {
+        batteryLevelTimer.cancel()
+        disposePhoneStateListeners()
 
         return super.onUnbind(intent)
     }
