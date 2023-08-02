@@ -127,10 +127,9 @@ class BluetoothService : Service() {
 
     private fun handleBatteryPercentageChanged(batteryPercentage: Int, immediate: Boolean) {
         if (isSeePhoneInfoEnabled) {
-            if ((batteryPercentage != prevBatteryPercentage && ((batteryPercentage + 12) % 25 == 0 || prevBatteryPercentage == -1)) || immediate) {
-                val roundedPercentage = Math.floorDiv(batteryPercentage + 12, 25) * 25
-                println("Updating battery level $roundedPercentage")
-                bluetoothModel.sharePhoneInfo(-1, "-1", roundedPercentage)
+            if (batteryPercentage != prevBatteryPercentage || immediate) {
+                println("Updating battery level $batteryPercentage")
+                bluetoothModel.sharePhoneInfo(-1, "-1", batteryPercentage)
             }
         }
 
@@ -209,6 +208,9 @@ class BluetoothService : Service() {
                         startSharePhoneInfo()
                         getBatteryPercentage(immediate = true)
                     } else {
+                        prevModifiedSignalStrengthLevel = -1
+                        prevNetworkType = ""
+                        prevBatteryPercentage = -1
                         disposePhoneStateListeners()
                     }
                 }

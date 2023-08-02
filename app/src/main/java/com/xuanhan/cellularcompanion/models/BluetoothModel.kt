@@ -88,8 +88,6 @@ class BluetoothModel {
     private var sharePhoneInfo2: (() -> Unit)? = null
     private var isConnectingToHotspot = false
     private var connectHotspot2: (() -> Unit)? = null
-    private var isDisconnectingFromHotspot = false
-    private var disconnectHotspot2: (() -> Unit)? = null
 
     private var onScanFailedCallback: ((() -> Unit) -> Unit)? = null
     private var onUnexpectedErrorCallback: ((() -> Unit) -> Unit)? = null
@@ -100,7 +98,8 @@ class BluetoothModel {
 
     private var hotspotDetailsRetryCallback: (() -> Unit)? = null
 
-    private val _connectStatus: MutableStateFlow<ConnectStatus> = MutableStateFlow(ConnectStatus.Disconnected)
+    private val _connectStatus: MutableStateFlow<ConnectStatus> =
+        MutableStateFlow(ConnectStatus.Disconnected)
     val connectStatus: StateFlow<ConnectStatus> = _connectStatus.asStateFlow()
     private val _isSeePhoneInfoEnabled: MutableStateFlow<Boolean> = MutableStateFlow(false)
     val isSeePhoneInfoEnabled: StateFlow<Boolean> = _isSeePhoneInfoEnabled.asStateFlow()
@@ -108,8 +107,7 @@ class BluetoothModel {
     class NotificationType {
         companion object {
             const val EnableHotspot = "0"
-            const val DisableHotspot = "1 0"
-            const val DisableHotspotIndicateOnly = "1 1"
+            const val DisableHotspot = "1"
             const val IndicateConnectedHotspot = "2"
             const val EnableSeePhoneInfo = "3"
             const val DisableSeePhoneInfo = "4"
@@ -122,7 +120,6 @@ class BluetoothModel {
             const val ShareHotspotDetails = "1"
             const val SharePhoneInfo = "2"
             const val ConnectToHotspot = "3"
-            const val DisconnectFromHotspot = "4"
         }
     }
 
@@ -241,6 +238,9 @@ class BluetoothModel {
                     if (isSetupComplete) {
                         // Set connect status to disconnected
                         _connectStatus.value = ConnectStatus.Disconnected
+
+                        // Disable hotspot if enabled
+                        disableHotspot()
 
                         // Disable see phone info
                         _isSeePhoneInfoEnabled.value = false
@@ -375,10 +375,6 @@ class BluetoothModel {
                     // Request device to connect to hotspot
                     connectHotspot2?.invoke()
                     return
-                } else if (isDisconnectingFromHotspot) {
-                    // Request device to disconnect from hotspot
-                    disconnectHotspot2?.invoke()
-                    return
                 }
 
                 // Subscribe to notifications on the notification characteristic
@@ -498,11 +494,6 @@ class BluetoothModel {
                         disableHotspot()
                     }
 
-                    NotificationType.DisableHotspotIndicateOnly -> {
-                        println("Disabling hotspot (no bluetooth)...")
-                        disableHotspot(noBluetooth = true)
-                    }
-
                     NotificationType.IndicateConnectedHotspot -> {
                         println("Indicating device connected to hotspot...")
                         indicateConnectedHotspot()
@@ -605,49 +596,6 @@ class BluetoothModel {
         }, 3000)
     }
 
-    private fun onTetheringStopped() {
-        println("Hotspot stopped")
-
-        if (gatt == null) {
-            println("Error: Device is unavailable.")
-            return
-        }
-        if (commandCharacteristic == null) {
-            println("Error: Command characteristic is unavailable")
-            return
-        }
-
-        // Check for Bluetooth Connect permission on Android 12+
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            if (ActivityCompat.checkSelfPermission(
-                    context,
-                    Manifest.permission.BLUETOOTH_CONNECT
-                ) != PackageManager.PERMISSION_GRANTED
-            ) {
-                println("Error: The Bluetooth Connect permission has not been granted.")
-                return
-            }
-        }
-
-        enqueueOperation {
-            isDisconnectingFromHotspot = true
-
-            disconnectHotspot2 = {
-                commandCharacteristic!!.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
-                commandCharacteristic!!.value = CommandType.DisconnectFromHotspot.toByteArray()
-                gatt!!.writeCharacteristic(commandCharacteristic!!)
-            }
-
-            if (bluetoothManager.getConnectedDevices(BluetoothProfile.GATT)
-                    .find { it.address == connectDevice?.address } == null
-            ) {
-                startScan()
-            } else {
-                disconnectHotspot2!!.invoke()
-            }
-        }
-    }
-
     @Synchronized
     private fun enqueueOperation(operation: () -> Unit) {
         operationQueue.add(operation)
@@ -676,7 +624,6 @@ class BluetoothModel {
         isSharingHotspotDetails = false
         isSharingPhoneInfo = false
         isConnectingToHotspot = false
-        isDisconnectingFromHotspot = false
         onHotspotDetailsSharedCallback = null
 
         doNextOperation()
@@ -1016,7 +963,7 @@ class BluetoothModel {
             }
         }
 
-        // Enqueue operation to share hotspot details
+        // Enqueue operation to share phone info
         enqueueOperation {
             startSharePhoneInfo(signalLevel, networkType, batteryPercentage)
         }
@@ -1053,17 +1000,13 @@ class BluetoothModel {
         }
     }
 
-    fun disableHotspot(noBluetooth: Boolean = false) {
+    fun disableHotspot() {
         // Indicate that hotspot is disconnected
         _connectStatus.value = ConnectStatus.Idle
 
         // Disconnect from hotspot
         if (wifiHotspotManager.isHotspotStartedByUs && wifiHotspotManager.isTetherActive) {
             wifiHotspotManager.stopTethering()
-        }
-
-        if (!noBluetooth) {
-            onTetheringStopped()
         }
     }
 
