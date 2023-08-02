@@ -1000,9 +1000,11 @@ class BluetoothModel {
         }
     }
 
-    fun disableHotspot() {
-        // Indicate that hotspot is disconnected
-        _connectStatus.value = ConnectStatus.Idle
+    fun disableHotspot(noUpdateStatus: Boolean = false) {
+        if (!noUpdateStatus) {
+            // Indicate that hotspot is disconnected
+            _connectStatus.value = ConnectStatus.Idle
+        }
 
         // Disconnect from hotspot
         if (wifiHotspotManager.isHotspotStartedByUs && wifiHotspotManager.isTetherActive) {
