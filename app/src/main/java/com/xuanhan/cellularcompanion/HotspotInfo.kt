@@ -51,7 +51,7 @@ fun HotspotInfo(navigator: DestinationsNavigator) {
                 .padding(16.dp, 0.dp, 16.dp, 32.dp)
         ) {
             Text(
-                "Enter this device's mobile hotspot credentials in the following fields. They will be sent to your Mac to allow your Mac to connect to your hotspot automatically. This may take a few tries.",
+                "Enter this device's mobile hotspot credentials in the following fields. They will be stored locally on your Mac to allow your Mac to connect to your hotspot automatically.",
                 style = MaterialTheme.typography.bodyMedium,
             )
             Spacer(modifier = Modifier.height(32.dp))
