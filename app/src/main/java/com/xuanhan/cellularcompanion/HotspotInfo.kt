@@ -64,7 +64,7 @@ fun HotspotInfo(navigator: DestinationsNavigator) {
                 },
                 value = ssid,
                 label = {
-                    Text("SSID")
+                    Text("Name")
                 },
                 supportingText = {
                     Text(
