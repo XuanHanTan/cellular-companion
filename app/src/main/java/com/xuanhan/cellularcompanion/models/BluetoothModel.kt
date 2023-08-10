@@ -88,6 +88,8 @@ class BluetoothModel {
     private var sharePhoneInfo2: (() -> Unit)? = null
     private var isConnectingToHotspot = false
     private var connectHotspot2: (() -> Unit)? = null
+    private var isIndicatingReset = false
+    private var indicateReset: (() -> Unit)? = null
 
     private var onScanFailedCallback: ((() -> Unit) -> Unit)? = null
     private var onUnexpectedErrorCallback: ((() -> Unit) -> Unit)? = null
@@ -95,6 +97,8 @@ class BluetoothModel {
     private var onBondFailedCallback: ((() -> Unit) -> Unit)? = null
     private var onHotspotDetailsShareFailedCallback: ((() -> Unit) -> Unit)? = null
     private var onHotspotFailedCallback: ((() -> Unit) -> Unit)? = null
+    private var onResetFailedCallback: ((() -> Unit) -> Unit)? = null
+    private var onResetCompleteCallback: (() -> Unit)? = null
 
     private var hotspotDetailsRetryCallback: (() -> Unit)? = null
 
@@ -111,6 +115,7 @@ class BluetoothModel {
             const val IndicateConnectedHotspot = "2"
             const val EnableSeePhoneInfo = "3"
             const val DisableSeePhoneInfo = "4"
+            const val IndicateReset = "5"
         }
     }
 
@@ -120,6 +125,7 @@ class BluetoothModel {
             const val ShareHotspotDetails = "1"
             const val SharePhoneInfo = "2"
             const val ConnectToHotspot = "3"
+            const val IndicateReset = "4"
         }
     }
 
@@ -179,7 +185,7 @@ class BluetoothModel {
             when (errorCode) {
                 SCAN_FAILED_APPLICATION_REGISTRATION_FAILED -> {
                     onScanFailedCallback?.invoke {
-                        reset()
+                        resetBLE()
                         initialize(context)
                     }
                     println("Scan failed: restart Bluetooth and press Retry")
@@ -187,7 +193,7 @@ class BluetoothModel {
 
                 else -> {
                     onScanFailedCallback?.invoke {
-                        reset()
+                        resetBLE()
                         initialize(context)
                     }
                     println("Scan failed with error code $errorCode")
@@ -266,7 +272,7 @@ class BluetoothModel {
                         // Run connect failed callback only during setup
                         if (isFirstInitializing) {
                             onConnectFailedCallback?.invoke {
-                                reset()
+                                resetBLE()
                                 initialize(context)
                             }
                         }
@@ -319,14 +325,14 @@ class BluetoothModel {
                     gatt.requestMtu(517)
                 } else {
                     onUnexpectedErrorCallback?.invoke {
-                        reset()
+                        resetBLE()
                         initialize(context)
                     }
                     println("Could not find service.")
                 }
             } else {
                 onUnexpectedErrorCallback?.invoke {
-                    reset()
+                    resetBLE()
                     initialize(context)
                 }
                 println("Service discovery failed due to internal error: $status")
@@ -375,13 +381,17 @@ class BluetoothModel {
                     // Request device to connect to hotspot
                     connectHotspot2?.invoke()
                     return
+                } else if (isIndicatingReset) {
+                    // Indicate reset to device
+                    indicateReset?.invoke()
+                    return
                 }
 
                 // Subscribe to notifications on the notification characteristic
                 enableNotifications()
             } else {
                 onUnexpectedErrorCallback?.invoke {
-                    reset()
+                    resetBLE()
                     initialize(context)
                 }
                 println("Error: MTU change failed with status $status")
@@ -442,6 +452,9 @@ class BluetoothModel {
                 } else if (isConnectingToHotspot) {
                     // Indicate that hotspot is connected
                     _connectStatus.value = ConnectStatus.Connected
+                } else if (isIndicatingReset) {
+                    // Continue reset
+                    reset2()
                 }
 
                 indicateOperationComplete()
@@ -451,7 +464,7 @@ class BluetoothModel {
                 if (isFirstInitializing) {
                     val initOnConnectCallback = initOnConnectCallback
                     onConnectFailedCallback?.invoke {
-                        reset()
+                        resetBLE()
                         isFirstInitializing = true
                         this@BluetoothModel.initOnConnectCallback = initOnConnectCallback
                         initialize(context)
@@ -466,6 +479,11 @@ class BluetoothModel {
                         hotspotDetailsRetryCallback?.let {
                             onHotspotDetailsShareFailedCallback?.invoke(it)
                         }
+                    }
+                } else if (isIndicatingReset) {
+                    onResetFailedCallback?.invoke {
+                        resetBLE()
+                        reset()
                     }
                 } else {
                     indicateOperationComplete()
@@ -509,6 +527,11 @@ class BluetoothModel {
                         _isSeePhoneInfoEnabled.value = false
                     }
 
+                    NotificationType.IndicateReset -> {
+                        println("Unlinking from Mac...")
+                        reset(indicateOnly = true)
+                    }
+
                     else -> {
                         println("Error: Received unknown payload from characteristic.")
                     }
@@ -527,7 +550,7 @@ class BluetoothModel {
 
         val initOnConnectCallback = initOnConnectCallback
         onBondFailedCallback?.invoke {
-            reset()
+            resetBLE()
             isFirstInitializing = true
             this@BluetoothModel.initOnConnectCallback = initOnConnectCallback
             initialize(context)
@@ -624,6 +647,8 @@ class BluetoothModel {
         isSharingHotspotDetails = false
         isSharingPhoneInfo = false
         isConnectingToHotspot = false
+        isIndicatingReset = false
+        onResetCompleteCallback = null
         onHotspotDetailsSharedCallback = null
 
         doNextOperation()
@@ -749,7 +774,7 @@ class BluetoothModel {
      * */
     private fun startScan() {
         // Reset BLE connection before starting scan
-        reset()
+        resetBLE()
 
         // Scan for BLE devices advertising this service UUID
         val filter =
@@ -921,7 +946,7 @@ class BluetoothModel {
         }
 
         hotspotDetailsRetryCallback = {
-            reset()
+            resetBLE()
             startShareHotspotDetails(ssid, password, onHotspotDetailsSharedCallback)
         }
 
@@ -1029,7 +1054,8 @@ class BluetoothModel {
         onHotspotDetailsShareFailedCallback: (() -> Unit) -> Unit,
         onConnectFailedCallback: (() -> Unit) -> Unit,
         onBondFailedCallback: (() -> Unit) -> Unit,
-        onHotspotFailedCallback: (() -> Unit) -> Unit
+        onHotspotFailedCallback: (() -> Unit) -> Unit,
+        onResetFailedCallback: (() -> Unit) -> Unit
     ) {
         this.onScanFailedCallback = onScanFailedCallback
         this.onUnexpectedErrorCallback = onUnexpectedErrorCallback
@@ -1037,12 +1063,17 @@ class BluetoothModel {
         this.onBondFailedCallback = onBondFailedCallback
         this.onHotspotDetailsShareFailedCallback = onHotspotDetailsShareFailedCallback
         this.onHotspotFailedCallback = onHotspotFailedCallback
+        this.onResetFailedCallback = onResetFailedCallback
+    }
+
+    fun registerForReset(onResetCompleteCallback: () -> Unit) {
+        this.onResetCompleteCallback = onResetCompleteCallback
     }
 
     /**
      * This function resets the BLE connection to allow reconnecting to a BLE device.
      * */
-    private fun reset() {
+    private fun resetBLE() {
         stopScan()
 
         connectDevice = null
@@ -1054,5 +1085,86 @@ class BluetoothModel {
         isDisconnecting = false
         connectionRetryCount = 0
         hotspotShareRetryCount = 0
+    }
+
+    fun reset(indicateOnly: Boolean = false) {
+        // Check for Bluetooth Connect permission on Android 12+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (ActivityCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.BLUETOOTH_CONNECT
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                println("Error: The Bluetooth Connect permission has not been granted.")
+                return
+            }
+        }
+
+        if (indicateOnly) {
+            reset2()
+        } else {
+            // Indicate to the Mac that this device is being unlinked
+            isIndicatingReset = true
+
+            indicateReset = {
+                commandCharacteristic!!.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+                commandCharacteristic!!.value = CommandType.IndicateReset.toByteArray()
+                gatt!!.writeCharacteristic(commandCharacteristic!!)
+            }
+
+            if (bluetoothManager.getConnectedDevices(BluetoothProfile.GATT)
+                    .find { it.address == connectDevice?.address } == null
+            ) {
+                startScan()
+            } else {
+                indicateReset!!.invoke()
+            }
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun reset2() {
+        // Reset all variables
+        serviceUUID = null
+        sharedKey = null
+        deviceAddress = null
+        isFirstInitializing = false
+        isInitializing = false
+        initOnConnectCallback = null
+        isSharingHotspotDetails = false
+        shareHotspotDetails2 = null
+        onHotspotDetailsSharedCallback = null
+        isSharingPhoneInfo = false
+        sharePhoneInfo2 = null
+        isConnectingToHotspot = false
+        connectHotspot2 = null
+        isIndicatingReset = false
+        indicateReset = null
+        hotspotDetailsRetryCallback = null
+        isSetupComplete = false
+        _connectStatus.value = ConnectStatus.Disconnected
+        _isSeePhoneInfoEnabled.value = false
+
+        // Disconnect from device
+        gatt?.disconnect()
+
+        // Un-bond from device
+        val bondedDevices = bluetoothAdapter.bondedDevices
+        for (bondedDevice in bondedDevices) {
+            if (bondedDevice.address == deviceAddress) {
+                try {
+                    bondedDevice::class.java.getMethod("removeBond").invoke(bondedDevice)
+                } catch (e: Exception) {
+                    println("Failed to un-bond from device: ${e.message}")
+                }
+                break
+            }
+        }
+
+        // Reset BLE connection
+        resetBLE()
+
+        // Let view model know that reset is complete
+        onResetCompleteCallback!!.invoke()
     }
 }

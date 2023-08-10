@@ -36,6 +36,10 @@ class MainViewModel : ViewModel() {
     val isShowingHotspotFailedDialog: StateFlow<Boolean> =
         _isShowingHotspotFailedDialog.asStateFlow()
     private lateinit var retryHotspotFailedDialogCallback: () -> Unit
+    private val _isShowingResetFailedDialog = MutableStateFlow(false)
+    val isShowingResetFailedDialog: StateFlow<Boolean> =
+        _isShowingResetFailedDialog.asStateFlow()
+    private lateinit var retryResetFailedDialogCallback: () -> Unit
     private val _isBluetoothEnabled = MutableStateFlow(true)
     val isBluetoothEnabled: StateFlow<Boolean> =
         _isBluetoothEnabled.asStateFlow()
@@ -50,7 +54,8 @@ class MainViewModel : ViewModel() {
             ::showConnectFailedDialog,
             ::showBondFailedDialog,
             ::showHotspotDetailsShareFailedDialog,
-            ::showHotspotFailedDialog
+            ::showHotspotFailedDialog,
+            ::showResetFailedDialog
         )
 
         viewModelScope.launch {
@@ -118,6 +123,16 @@ class MainViewModel : ViewModel() {
     fun confirmHotspotFailedDialog() {
         _isShowingHotspotFailedDialog.value = false
         retryHotspotFailedDialogCallback()
+    }
+
+    private fun showResetFailedDialog(retryCallback: () -> Unit) {
+        _isShowingResetFailedDialog.value = true
+        retryResetFailedDialogCallback = retryCallback
+    }
+
+    fun confirmResetFailedDialog() {
+        _isShowingResetFailedDialog.value = false
+        retryResetFailedDialogCallback()
     }
 
     fun setBluetoothEnabled(context: Context): Boolean {

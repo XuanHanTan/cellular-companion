@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.ripple.LocalRippleTheme
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -21,6 +22,7 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
@@ -30,6 +32,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.ramcosta.composedestinations.annotation.Destination
@@ -42,13 +45,43 @@ import com.xuanhan.cellularcompanion.models.BluetoothModel.Companion.ConnectStat
 @OptIn(ExperimentalMaterial3Api::class)
 @Destination
 fun HomePage(navigator: DestinationsNavigator) {
+    val context = LocalContext.current
     val interactionSource = remember { MutableInteractionSource() }
-    val viewModel = HomePageViewModel()
+    val viewModel = HomePageViewModel(context, navigator)
 
     val isPressed by interactionSource.collectIsPressedAsState()
     val connectStatus by bluetoothModel.connectStatus.collectAsState()
+    val isShowingConfirmUnlinkDialog by viewModel.isShowingConfirmUnlinkDialog.collectAsState()
+
+    @Composable
+    fun ConfirmUnlinkDialog() {
+        AlertDialog(
+            onDismissRequest = {},
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.hideConfirmUnlinkDialog()
+                }) {
+                    Text(text = "Back")
+                }
+                TextButton(onClick = {
+                    viewModel.confirmConfirmUnlinkDialog()
+                }) {
+                    Text(text = "Confirm")
+                }
+            },
+            dismissButton = {},
+            title = {
+                Text(text = "Confirm unlink Mac?")
+            },
+            text = {
+                Text(text = "This will disconnect your phone from your Mac and you will need to go through setup again to reconnect.")
+            }
+        )
+    }
 
     Scaffold {
+        if (isShowingConfirmUnlinkDialog)
+            ConfirmUnlinkDialog()
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
@@ -165,7 +198,7 @@ fun HomePage(navigator: DestinationsNavigator) {
                 },
                 headlineText = { Text("Unlink Mac", color = MaterialTheme.colorScheme.error) },
                 modifier = Modifier.clickable {
-
+                    viewModel.showConfirmUnlinkDialog()
                 }
             )
         }

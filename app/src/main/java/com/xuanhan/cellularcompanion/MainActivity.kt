@@ -153,6 +153,7 @@ class MainActivity : ComponentActivity() {
                     val showConnectFailedDialogState: Boolean by viewModel.isShowingConnectFailedDialog.collectAsState()
                     val showBondFailedDialogState: Boolean by viewModel.isShowingBondFailedDialog.collectAsState()
                     val showHotspotFailedDialogState: Boolean by viewModel.isShowingHotspotFailedDialog.collectAsState()
+                    val showResetFailedDialogState: Boolean by viewModel.isShowingResetFailedDialog.collectAsState()
                     val isBluetoothEnabled: Boolean by viewModel.isBluetoothEnabled.collectAsState()
 
                     if (showScanFailedDialogState)
@@ -167,6 +168,8 @@ class MainActivity : ComponentActivity() {
                         BondFailedDialog()
                     if (showHotspotFailedDialogState)
                         HotspotFailedDialog()
+                    if (showResetFailedDialogState)
+                        ResetFailedDialog()
                     if (!isBluetoothEnabled)
                         EnableBluetoothDialog()
 
@@ -330,6 +333,27 @@ class MainActivity : ComponentActivity() {
             },
             text = {
                 Text(text = "Bluetooth is required for Cellular Companion to connect to your Mac.")
+            }
+        )
+    }
+
+    @Composable
+    fun ResetFailedDialog() {
+        AlertDialog(
+            onDismissRequest = {},
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.confirmResetFailedDialog()
+                }) {
+                    Text(text = "Retry")
+                }
+            },
+            dismissButton = {},
+            title = {
+                Text(text = "Failed to unlink Mac")
+            },
+            text = {
+                Text(text = "Ensure that your Mac remains close to this device and try again.")
             }
         )
     }
