@@ -64,6 +64,7 @@ class BluetoothModel {
     private lateinit var wifiHotspotManager: WifiHotspotManager
     private val commandCharacteristicUUID = "00000001-0000-1000-8000-00805f9b34fb"
     private val notificationCharacteristicUUID = "00000002-0000-1000-8000-00805f9b34fb"
+    private val cccdUuid = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
 
     private var serviceUUID: String? = null
     private var sharedKey: String? = null
@@ -90,6 +91,7 @@ class BluetoothModel {
     private var connectHotspot2: (() -> Unit)? = null
     private var isIndicatingReset = false
     private var indicateReset: (() -> Unit)? = null
+    private var indicateReset2: (() -> Unit)? = null
 
     private var onScanFailedCallback: ((() -> Unit) -> Unit)? = null
     private var onUnexpectedErrorCallback: ((() -> Unit) -> Unit)? = null
@@ -412,10 +414,12 @@ class BluetoothModel {
                     // Indicate that initialization is complete
                     initOnConnectCallback?.invoke()
                     indicateOperationComplete()
-                }
 
-                // Indicate that device is connected
-                _connectStatus.value = ConnectStatus.Idle
+                    // Indicate that device is connected
+                    _connectStatus.value = ConnectStatus.Idle
+                } else if (isIndicatingReset) {
+                    indicateReset2?.invoke()
+                }
             } else {
                 println("Error: Failed to write to descriptor of characteristic ${descriptor!!.characteristic.uuid} with status $status")
                 if (!isDisconnecting) {
@@ -648,7 +652,6 @@ class BluetoothModel {
         isSharingPhoneInfo = false
         isConnectingToHotspot = false
         isIndicatingReset = false
-        onResetCompleteCallback = null
         onHotspotDetailsSharedCallback = null
 
         doNextOperation()
@@ -873,7 +876,6 @@ class BluetoothModel {
             }
         }
 
-        val cccdUuid = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
         val descriptor = notificationCharacteristic!!.getDescriptor(cccdUuid)
         gatt!!.setCharacteristicNotification(notificationCharacteristic!!, true)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -1066,10 +1068,6 @@ class BluetoothModel {
         this.onResetFailedCallback = onResetFailedCallback
     }
 
-    fun registerForReset(onResetCompleteCallback: () -> Unit) {
-        this.onResetCompleteCallback = onResetCompleteCallback
-    }
-
     /**
      * This function resets the BLE connection to allow reconnecting to a BLE device.
      * */
@@ -1087,6 +1085,10 @@ class BluetoothModel {
         hotspotShareRetryCount = 0
     }
 
+    fun registerForReset(onResetCompleteCallback: () -> Unit) {
+        this.onResetCompleteCallback = onResetCompleteCallback
+    }
+
     fun reset(indicateOnly: Boolean = false) {
         // Check for Bluetooth Connect permission on Android 12+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -1100,30 +1102,60 @@ class BluetoothModel {
             }
         }
 
-        if (indicateOnly) {
-            reset2()
-        } else {
-            // Indicate to the Mac that this device is being unlinked
-            isIndicatingReset = true
+        // Indicate to the Mac that this device is being unlinked
+        isIndicatingReset = true
 
-            indicateReset = {
+        indicateReset = {
+            if (notificationCharacteristic != null) {
+                val descriptor = notificationCharacteristic!!.getDescriptor(cccdUuid)
+                gatt!!.setCharacteristicNotification(notificationCharacteristic!!, false)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    gatt!!.writeDescriptor(
+                        descriptor,
+                        BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE
+                    )
+                } else {
+                    descriptor.value = BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE
+                    gatt!!.writeDescriptor(descriptor)
+                }
+            }
+        }
+
+        indicateReset2 = {
+            if (indicateOnly) {
+                indicateOperationComplete()
+                reset2()
+            } else {
                 commandCharacteristic!!.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
                 commandCharacteristic!!.value = CommandType.IndicateReset.toByteArray()
                 gatt!!.writeCharacteristic(commandCharacteristic!!)
             }
+        }
 
-            if (bluetoothManager.getConnectedDevices(BluetoothProfile.GATT)
-                    .find { it.address == connectDevice?.address } == null
-            ) {
-                startScan()
-            } else {
-                indicateReset!!.invoke()
-            }
+        if (bluetoothManager.getConnectedDevices(BluetoothProfile.GATT)
+                .find { it.address == connectDevice?.address } == null
+        ) {
+            startScan()
+        } else {
+            indicateReset!!.invoke()
         }
     }
 
     @SuppressLint("MissingPermission")
     private fun reset2() {
+        // Un-bond from device
+        val bondedDevices = bluetoothAdapter.bondedDevices
+        for (bondedDevice in bondedDevices) {
+            if (bondedDevice.address == deviceAddress) {
+                try {
+                    bondedDevice::class.java.getMethod("removeBond").invoke(bondedDevice)
+                } catch (e: Exception) {
+                    println("Failed to un-bond from device: ${e.message}")
+                }
+                break
+            }
+        }
+
         // Reset all variables
         serviceUUID = null
         sharedKey = null
@@ -1147,19 +1179,6 @@ class BluetoothModel {
 
         // Disconnect from device
         gatt?.disconnect()
-
-        // Un-bond from device
-        val bondedDevices = bluetoothAdapter.bondedDevices
-        for (bondedDevice in bondedDevices) {
-            if (bondedDevice.address == deviceAddress) {
-                try {
-                    bondedDevice::class.java.getMethod("removeBond").invoke(bondedDevice)
-                } catch (e: Exception) {
-                    println("Failed to un-bond from device: ${e.message}")
-                }
-                break
-            }
-        }
 
         // Reset BLE connection
         resetBLE()

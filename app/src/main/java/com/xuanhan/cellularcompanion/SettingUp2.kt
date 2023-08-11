@@ -20,6 +20,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.ramcosta.composedestinations.annotation.Destination
 import com.ramcosta.composedestinations.navigation.DestinationsNavigator
+import com.xuanhan.cellularcompanion.destinations.SettingUp2Destination
 import com.xuanhan.cellularcompanion.destinations.StartDestination
 import com.xuanhan.cellularcompanion.viewmodels.SettingUpViewModel
 import kotlinx.coroutines.Dispatchers
@@ -39,7 +40,9 @@ fun SettingUp2(navigator: DestinationsNavigator, ssid: String, password: String)
             coroutineScope.launch(context = Dispatchers.IO) {
                 viewModel.completeSetup()
                 coroutineScope.launch(context = Dispatchers.Main.immediate) {
-                    navigator.navigate(StartDestination)
+                    navigator.navigate(StartDestination) {
+                        popUpTo(SettingUp2Destination.route) { inclusive = true }
+                    }
                 }
             }
         }
