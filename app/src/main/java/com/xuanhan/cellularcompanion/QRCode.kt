@@ -25,7 +25,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.app.ComponentActivity
 import androidx.core.content.ContextCompat
-import androidx.navigation.NavController
 import com.ramcosta.composedestinations.annotation.Destination
 import com.ramcosta.composedestinations.navigation.DestinationsNavigator
 import com.ramcosta.composedestinations.navigation.popUpTo
@@ -39,7 +38,7 @@ import java.util.concurrent.Executors
 @OptIn(ExperimentalMaterial3Api::class)
 @androidx.annotation.OptIn(androidx.camera.core.ExperimentalGetImage::class)
 @Destination
-fun QRCode(navigator: DestinationsNavigator, navController: NavController) {
+fun QRCode(navigator: DestinationsNavigator) {
     Scaffold(
         topBar = {
             LargeTopAppBar(
@@ -71,7 +70,7 @@ fun QRCode(navigator: DestinationsNavigator, navController: NavController) {
                 modifier = Modifier.padding(horizontal = 16.dp)
             )
             Spacer(modifier = Modifier.weight(1f))
-            PreviewViewComposable(navigator = navigator, navController = navController)
+            PreviewViewComposable(navigator = navigator)
             Spacer(modifier = Modifier.weight(1f))
         }
     }
@@ -79,7 +78,7 @@ fun QRCode(navigator: DestinationsNavigator, navController: NavController) {
 
 @androidx.camera.core.ExperimentalGetImage
 @Composable
-fun PreviewViewComposable(navigator: DestinationsNavigator, navController: NavController) {
+fun PreviewViewComposable(navigator: DestinationsNavigator) {
     AndroidView(
         { context ->
             val cameraExecutor = Executors.newSingleThreadExecutor()
@@ -110,11 +109,12 @@ fun PreviewViewComposable(navigator: DestinationsNavigator, navController: NavCo
                             val serviceUUID = data.get("serviceUUID").toString()
                             val sharedKey = data.get("sharedKey").toString()
 
+                            it.clearAnalyzer()
+                            cameraProvider.unbindAll()
+
                             navigator.navigate(SettingUpDestination(serviceUUID, sharedKey)) {
                                 popUpTo(IntroDestination) { inclusive = true }
                             }
-                            it.clearAnalyzer()
-                            cameraProvider.unbindAll()
                         })
                     }
                 val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA

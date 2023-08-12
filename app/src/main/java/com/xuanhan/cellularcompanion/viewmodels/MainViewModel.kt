@@ -51,9 +51,9 @@ class MainViewModel : ViewModel() {
         bluetoothModel.registerForErrorHandling(
             ::showScanFailedDialog,
             ::showUnexpectedErrorDialog,
+            ::showHotspotDetailsShareFailedDialog,
             ::showConnectFailedDialog,
             ::showBondFailedDialog,
-            ::showHotspotDetailsShareFailedDialog,
             ::showHotspotFailedDialog,
             ::showResetFailedDialog
         )
