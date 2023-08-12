@@ -418,7 +418,9 @@ class BluetoothModel {
                     // Indicate that device is connected
                     _connectStatus.value = ConnectStatus.Idle
                 } else if (isIndicatingReset) {
-                    indicateReset2?.invoke()
+                    // Continue reset
+                    reset2()
+                    indicateOperationComplete()
                 }
             } else {
                 println("Error: Failed to write to descriptor of characteristic ${descriptor!!.characteristic.uuid} with status $status")
@@ -457,8 +459,9 @@ class BluetoothModel {
                     // Indicate that hotspot is connected
                     _connectStatus.value = ConnectStatus.Connected
                 } else if (isIndicatingReset) {
-                    // Continue reset
-                    reset2()
+                    // Unsubscribe from notifications
+                    indicateReset2!!.invoke()
+                    return
                 }
 
                 indicateOperationComplete()
@@ -1106,6 +1109,16 @@ class BluetoothModel {
         isIndicatingReset = true
 
         indicateReset = {
+            if (indicateOnly) {
+                indicateReset2!!.invoke()
+            } else {
+                commandCharacteristic!!.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+                commandCharacteristic!!.value = CommandType.IndicateReset.toByteArray()
+                gatt!!.writeCharacteristic(commandCharacteristic!!)
+            }
+        }
+
+        indicateReset2 = {
             if (notificationCharacteristic != null) {
                 val descriptor = notificationCharacteristic!!.getDescriptor(cccdUuid)
                 gatt!!.setCharacteristicNotification(notificationCharacteristic!!, false)
@@ -1118,17 +1131,6 @@ class BluetoothModel {
                     descriptor.value = BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE
                     gatt!!.writeDescriptor(descriptor)
                 }
-            }
-        }
-
-        indicateReset2 = {
-            if (indicateOnly) {
-                indicateOperationComplete()
-                reset2()
-            } else {
-                commandCharacteristic!!.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
-                commandCharacteristic!!.value = CommandType.IndicateReset.toByteArray()
-                gatt!!.writeCharacteristic(commandCharacteristic!!)
             }
         }
 

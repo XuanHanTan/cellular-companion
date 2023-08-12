@@ -260,10 +260,17 @@ class BluetoothService : Service() {
         }
     }
 
-    override fun onUnbind(intent: Intent?): Boolean {
+    override fun onDestroy() {
         batteryLevelTimer.cancel()
         disposePhoneStateListeners()
+        prevModifiedSignalStrengthLevel = -1
+        prevNetworkType = ""
+        prevBatteryPercentage = -1
+        isSeePhoneInfoEnabled = false
+        started = false
 
-        return super.onUnbind(intent)
+        println("Service stopped")
+
+        super.onDestroy()
     }
 }
