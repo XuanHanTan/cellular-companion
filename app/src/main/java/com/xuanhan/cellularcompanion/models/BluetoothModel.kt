@@ -91,7 +91,6 @@ class BluetoothModel {
     private var connectHotspot2: (() -> Unit)? = null
     private var isIndicatingReset = false
     private var indicateReset: (() -> Unit)? = null
-    private var indicateReset2: (() -> Unit)? = null
 
     private var onScanFailedCallback: ((() -> Unit) -> Unit)? = null
     private var onUnexpectedErrorCallback: ((() -> Unit) -> Unit)? = null
@@ -417,10 +416,6 @@ class BluetoothModel {
 
                     // Indicate that device is connected
                     _connectStatus.value = ConnectStatus.Idle
-                } else if (isIndicatingReset) {
-                    // Continue reset
-                    reset2()
-                    indicateOperationComplete()
                 }
             } else {
                 println("Error: Failed to write to descriptor of characteristic ${descriptor!!.characteristic.uuid} with status $status")
@@ -459,8 +454,8 @@ class BluetoothModel {
                     // Indicate that hotspot is connected
                     _connectStatus.value = ConnectStatus.Connected
                 } else if (isIndicatingReset) {
-                    // Unsubscribe from notifications
-                    indicateReset2!!.invoke()
+                    // Complete reset
+                    reset2()
                     return
                 }
 
@@ -1110,27 +1105,11 @@ class BluetoothModel {
 
         indicateReset = {
             if (indicateOnly) {
-                indicateReset2!!.invoke()
+                reset2()
             } else {
                 commandCharacteristic!!.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
                 commandCharacteristic!!.value = CommandType.IndicateReset.toByteArray()
                 gatt!!.writeCharacteristic(commandCharacteristic!!)
-            }
-        }
-
-        indicateReset2 = {
-            if (notificationCharacteristic != null) {
-                val descriptor = notificationCharacteristic!!.getDescriptor(cccdUuid)
-                gatt!!.setCharacteristicNotification(notificationCharacteristic!!, false)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    gatt!!.writeDescriptor(
-                        descriptor,
-                        BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE
-                    )
-                } else {
-                    descriptor.value = BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE
-                    gatt!!.writeDescriptor(descriptor)
-                }
             }
         }
 
@@ -1145,6 +1124,21 @@ class BluetoothModel {
 
     @SuppressLint("MissingPermission")
     private fun reset2() {
+        // Disable notifications
+        if (notificationCharacteristic != null) {
+            val descriptor = notificationCharacteristic!!.getDescriptor(cccdUuid)
+            gatt!!.setCharacteristicNotification(notificationCharacteristic!!, false)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                gatt!!.writeDescriptor(
+                    descriptor,
+                    BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE
+                )
+            } else {
+                descriptor.value = BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE
+                gatt!!.writeDescriptor(descriptor)
+            }
+        }
+
         // Un-bond from device
         val bondedDevices = bluetoothAdapter.bondedDevices
         for (bondedDevice in bondedDevices) {
