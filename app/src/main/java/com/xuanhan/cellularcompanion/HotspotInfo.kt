@@ -38,8 +38,6 @@ fun HotspotInfo(navigator: DestinationsNavigator) {
     var password by remember { mutableStateOf("") }
     var isSSIDValid by remember { mutableStateOf(true) }
 
-    // TODO: ensure that wifi ssid/password is in ASCII and does not contain "
-
     Scaffold(topBar = {
         LargeTopAppBar(
             title = { Text(text = "Hotspot credentials") },

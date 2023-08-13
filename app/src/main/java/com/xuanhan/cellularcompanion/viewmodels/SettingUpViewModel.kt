@@ -3,8 +3,15 @@ package com.xuanhan.cellularcompanion.viewmodels
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import androidx.datastore.preferences.core.edit
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.xuanhan.cellularcompanion.MainActivity
 import com.xuanhan.cellularcompanion.bluetoothModel
+import com.xuanhan.cellularcompanion.models.dataStore
+import com.xuanhan.cellularcompanion.passwordKey
+import com.xuanhan.cellularcompanion.ssidKey
+import kotlinx.coroutines.launch
 
 fun Context.findActivity(): Activity {
     var context = this
@@ -15,11 +22,12 @@ fun Context.findActivity(): Activity {
     throw IllegalStateException("Error: Context should be of an Activity.")
 }
 
-class SettingUpViewModel(private val context: Context) {
+class SettingUpViewModel: ViewModel() {
     suspend fun setupBluetooth(
         serviceUUID: String,
         sharedKey: String,
-        onConnectCallback: () -> Unit
+        context: Context,
+        onConnectCallback: () -> Unit,
     ) {
         bluetoothModel.initializeFromQR(
             serviceUUID,
@@ -29,15 +37,23 @@ class SettingUpViewModel(private val context: Context) {
         )
     }
 
-    fun shareHotspotDetails(ssid: String, password: String, onCompleteCallback: () -> Unit) {
+    fun shareHotspotDetails(ssid: String, password: String, context: Context, onCompleteCallback: () -> Unit) {
         bluetoothModel.shareHotspotDetails(
             ssid,
             password,
-            onHotspotDetailsSharedCallback = onCompleteCallback
+            onHotspotDetailsSharedCallback = {
+                viewModelScope.launch {
+                    context.dataStore.edit { settings ->
+                        settings[ssidKey] = ssid
+                        settings[passwordKey] = password
+                    }
+                    onCompleteCallback()
+                }
+            }
         )
     }
 
-    suspend fun completeSetup() {
+    suspend fun completeSetup(context: Context) {
         bluetoothModel.markSetupComplete()
         val mainActivity = context.findActivity() as MainActivity
         mainActivity.startService()

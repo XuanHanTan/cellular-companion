@@ -33,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import com.google.accompanist.navigation.material.ExperimentalMaterialNavigationApi
 import com.ramcosta.composedestinations.DestinationsNavHost
 import com.ramcosta.composedestinations.animations.defaults.RootNavGraphDefaultAnimations
@@ -59,6 +60,8 @@ lateinit var bluetoothService: BluetoothService
 var requiresBtPermissionCheck = false
 val isSetupCompleteKey = booleanPreferencesKey("isSetupComplete")
 var isSetupComplete by Delegates.notNull<Boolean>()
+val ssidKey = stringPreferencesKey("ssid")
+val passwordKey = stringPreferencesKey("password")
 
 // TODO: handle missing permissions
 class MainActivity : ComponentActivity() {

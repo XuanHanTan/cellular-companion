@@ -261,15 +261,17 @@ class BluetoothService : Service() {
     }
 
     override fun onDestroy() {
-        batteryLevelTimer.cancel()
-        disposePhoneStateListeners()
-        prevModifiedSignalStrengthLevel = -1
-        prevNetworkType = ""
-        prevBatteryPercentage = -1
-        isSeePhoneInfoEnabled = false
-        started = false
+        if (started) {
+            batteryLevelTimer.cancel()
+            disposePhoneStateListeners()
+            prevModifiedSignalStrengthLevel = -1
+            prevNetworkType = ""
+            prevBatteryPercentage = -1
+            isSeePhoneInfoEnabled = false
+            started = false
 
-        println("Service stopped")
+            println("Service stopped")
+        }
 
         super.onDestroy()
     }

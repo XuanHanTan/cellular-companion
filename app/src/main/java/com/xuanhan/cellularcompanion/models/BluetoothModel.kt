@@ -895,15 +895,6 @@ class BluetoothModel {
         password: String,
         onHotspotDetailsSharedCallback: () -> Unit
     ) {
-        if (gatt == null) {
-            println("Error: Device is unavailable.")
-            return
-        }
-        if (commandCharacteristic == null) {
-            println("Error: Command characteristic is unavailable")
-            return
-        }
-
         // Check for Bluetooth Connect permission on Android 12+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             if (ActivityCompat.checkSelfPermission(
@@ -952,6 +943,7 @@ class BluetoothModel {
 
         if (bluetoothManager.getConnectedDevices(BluetoothProfile.GATT)
                 .find { it.address == connectDevice?.address } == null
+            || gatt == null || commandCharacteristic == null
         ) {
             startScan()
         } else {
@@ -1103,22 +1095,24 @@ class BluetoothModel {
         // Indicate to the Mac that this device is being unlinked
         isIndicatingReset = true
 
-        indicateReset = {
-            if (indicateOnly) {
-                reset2()
-            } else {
-                commandCharacteristic!!.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
-                commandCharacteristic!!.value = CommandType.IndicateReset.toByteArray()
-                gatt!!.writeCharacteristic(commandCharacteristic!!)
+        enqueueOperation {
+            indicateReset = {
+                if (indicateOnly) {
+                    reset2()
+                } else {
+                    commandCharacteristic!!.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+                    commandCharacteristic!!.value = CommandType.IndicateReset.toByteArray()
+                    gatt!!.writeCharacteristic(commandCharacteristic!!)
+                }
             }
-        }
 
-        if (bluetoothManager.getConnectedDevices(BluetoothProfile.GATT)
-                .find { it.address == connectDevice?.address } == null
-        ) {
-            startScan()
-        } else {
-            indicateReset!!.invoke()
+            if (bluetoothManager.getConnectedDevices(BluetoothProfile.GATT)
+                    .find { it.address == connectDevice?.address } == null
+            ) {
+                startScan()
+            } else {
+                indicateReset!!.invoke()
+            }
         }
     }
 

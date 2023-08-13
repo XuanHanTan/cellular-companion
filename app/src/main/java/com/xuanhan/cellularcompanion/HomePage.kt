@@ -37,6 +37,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.ramcosta.composedestinations.annotation.Destination
 import com.ramcosta.composedestinations.navigation.DestinationsNavigator
+import com.xuanhan.cellularcompanion.destinations.ChangeHotspotCredentialsDestination
 import com.xuanhan.cellularcompanion.utilities.NoRippleTheme
 import com.xuanhan.cellularcompanion.viewmodels.HomePageViewModel
 import com.xuanhan.cellularcompanion.models.BluetoothModel.Companion.ConnectStatus
@@ -56,20 +57,23 @@ fun HomePage(navigator: DestinationsNavigator) {
     @Composable
     fun ConfirmUnlinkDialog() {
         AlertDialog(
-            onDismissRequest = {},
+            onDismissRequest = {
+                viewModel.hideConfirmUnlinkDialog()
+            },
             confirmButton = {
-                TextButton(onClick = {
-                    viewModel.hideConfirmUnlinkDialog()
-                }) {
-                    Text(text = "Back")
-                }
                 TextButton(onClick = {
                     viewModel.confirmConfirmUnlinkDialog()
                 }) {
                     Text(text = "Confirm")
                 }
             },
-            dismissButton = {},
+            dismissButton = {
+                TextButton(onClick = {
+                    viewModel.hideConfirmUnlinkDialog()
+                }) {
+                    Text(text = "Back")
+                }
+            },
             title = {
                 Text(text = "Confirm unlink Mac?")
             },
@@ -171,9 +175,9 @@ fun HomePage(navigator: DestinationsNavigator) {
                         contentDescription = "Settings icon"
                     )
                 },
-                headlineText = { Text("Configure hotspot settings") },
+                headlineText = { Text("Configure hotspot credentials") },
                 modifier = Modifier.clickable {
-
+                    navigator.navigate(ChangeHotspotCredentialsDestination)
                 }
             )
             ListItem(
