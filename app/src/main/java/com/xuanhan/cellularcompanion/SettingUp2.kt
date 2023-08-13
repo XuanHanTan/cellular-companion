@@ -31,14 +31,14 @@ import kotlinx.coroutines.launch
 @Destination
 fun SettingUp2(navigator: DestinationsNavigator, ssid: String, password: String) {
     val currentContext = LocalContext.current
-    val viewModel = remember { SettingUpViewModel(currentContext) }
+    val viewModel = remember { SettingUpViewModel() }
     val coroutineScope = rememberCoroutineScope()
 
     LaunchedEffect(keys = arrayOf(ssid, password)) {
-        viewModel.shareHotspotDetails(ssid, password) {
+        viewModel.shareHotspotDetails(ssid, password, context = currentContext) {
             println("Hotspot credentials shared successfully!")
             coroutineScope.launch(context = Dispatchers.IO) {
-                viewModel.completeSetup()
+                viewModel.completeSetup(context = currentContext)
                 coroutineScope.launch(context = Dispatchers.Main.immediate) {
                     navigator.navigate(StartDestination) {
                         popUpTo(SettingUp2Destination.route) { inclusive = true }

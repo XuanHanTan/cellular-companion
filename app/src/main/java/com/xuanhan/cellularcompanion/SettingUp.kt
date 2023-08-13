@@ -31,11 +31,11 @@ import kotlinx.coroutines.launch
 @Destination
 fun SettingUp(navigator: DestinationsNavigator, serviceUUID: String, sharedKey: String) {
     val currentContext = LocalContext.current
-    val viewModel = remember { SettingUpViewModel(currentContext.applicationContext) }
+    val viewModel = remember { SettingUpViewModel() }
     val coroutineScope = rememberCoroutineScope()
 
     LaunchedEffect(keys = arrayOf(serviceUUID, sharedKey)) {
-        viewModel.setupBluetooth(serviceUUID, sharedKey) {
+        viewModel.setupBluetooth(serviceUUID, sharedKey, context = currentContext) {
             coroutineScope.launch(context = Dispatchers.Main.immediate) {
                 navigator.navigate(HotspotInfoDestination()) {
                     popUpTo(SettingUpDestination.route) { inclusive = true }
