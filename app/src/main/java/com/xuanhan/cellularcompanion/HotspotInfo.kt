@@ -36,6 +36,7 @@ import com.xuanhan.cellularcompanion.destinations.SettingUp2Destination
 fun HotspotInfo(navigator: DestinationsNavigator) {
     var ssid by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var isSSIDValid by remember { mutableStateOf(true) }
 
     // TODO: ensure that wifi ssid/password is in ASCII and does not contain "
 
@@ -67,14 +68,23 @@ fun HotspotInfo(navigator: DestinationsNavigator) {
                     Text("Name")
                 },
                 supportingText = {
-                    Text(
-                        text = "${ssid.length}/32",
-                    )
+                    if (isSSIDValid) {
+                        Text(
+                            text = "${ssid.length}/32",
+                        )
+                    } else {
+                        Text(
+                            text = "Invalid network name",
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
                 },
+                isError = !isSSIDValid,
                 onValueChange = { newValue ->
                     if (newValue.length <= 32) {
                         ssid = newValue
                     }
+                    isSSIDValid = !newValue.contains("\"")
                 },
                 modifier = Modifier.fillMaxWidth(),
             )
