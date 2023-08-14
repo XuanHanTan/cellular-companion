@@ -10,6 +10,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -49,25 +50,35 @@ fun ChangeHotspotCredentials(navigator: DestinationsNavigator) {
     val ssid by viewModel.ssid.collectAsState()
     val password by viewModel.password.collectAsState()
     val prevSSID by viewModel.prevSSID.collectAsState()
+    val prevPassword by viewModel.prevPassword.collectAsState()
     var isSSIDValid by remember { mutableStateOf(true) }
     var isLoading by remember { mutableStateOf(false) }
 
-    Scaffold(
-        topBar = {
-            LargeTopAppBar(
-                title = { Text(text = "Change hotspot credentials") },
-            )
-        },
-        snackbarHost = {
-            SnackbarHost(snackbarHostState) {
-                Snackbar(it)
-            }
-        }) {
+    Scaffold(topBar = {
+        LargeTopAppBar(
+            title = { Text(text = "Change hotspot credentials") },
+            navigationIcon = {
+                IconButton(onClick = {
+                    navigator.popBackStack()
+                }) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.outline_arrow_back_24),
+                        contentDescription = "Back button"
+                    )
+                }
+            },
+        )
+    }, snackbarHost = {
+        SnackbarHost(snackbarHostState) {
+            Snackbar(it)
+        }
+    }) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
                 .padding(it)
                 .padding(16.dp, 0.dp, 16.dp, 32.dp)
+                .fillMaxWidth()
         ) {
             if (isLoading) {
                 Spacer(modifier = Modifier.weight(1f))
@@ -157,7 +168,7 @@ fun ChangeHotspotCredentials(navigator: DestinationsNavigator) {
                             }
                         },
                     )
-                }, enabled = ssid.isNotEmpty() && ssid != prevSSID) {
+                }, enabled = ssid.isNotEmpty() && (ssid != prevSSID || password != prevPassword)) {
                     Text("Save")
                 }
             }

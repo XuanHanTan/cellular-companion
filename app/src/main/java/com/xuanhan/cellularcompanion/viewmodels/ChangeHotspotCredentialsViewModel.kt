@@ -19,6 +19,8 @@ class ChangeHotspotCredentialsViewModel(context: Context) : ViewModel() {
     val password = MutableStateFlow("")
     private val _prevSSID = MutableStateFlow("")
     val prevSSID = _prevSSID.asStateFlow()
+    private val _prevPassword = MutableStateFlow("")
+    val prevPassword = _prevPassword.asStateFlow()
 
     init {
         viewModelScope.launch {
@@ -28,10 +30,13 @@ class ChangeHotspotCredentialsViewModel(context: Context) : ViewModel() {
                 ssid.value = it
                 _prevSSID.value = it
             }
+        }
+        viewModelScope.launch {
             context.dataStore.data.map { settings ->
                 settings[passwordKey] ?: ""
             }.collect {
                 password.value = it
+                _prevPassword.value = it
             }
         }
     }

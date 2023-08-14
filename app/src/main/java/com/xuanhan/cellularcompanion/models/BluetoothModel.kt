@@ -578,15 +578,6 @@ class BluetoothModel {
         val timer = Timer()
         timer.schedule(object : TimerTask() {
             override fun run() {
-                if (gatt == null) {
-                    println("Error: Device is unavailable.")
-                    return
-                }
-                if (commandCharacteristic == null) {
-                    println("Error: Command characteristic is unavailable")
-                    return
-                }
-
                 // Check for Bluetooth Connect permission on Android 12+
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                     if (ActivityCompat.checkSelfPermission(
@@ -611,6 +602,7 @@ class BluetoothModel {
 
                     if (bluetoothManager.getConnectedDevices(BluetoothProfile.GATT)
                             .find { it.address == connectDevice?.address } == null
+                        || gatt == null || commandCharacteristic == null
                     ) {
                         startScan()
                     } else {
@@ -728,9 +720,11 @@ class BluetoothModel {
             return
         }
 
-        isInitializing = true
-        this.initOnConnectCallback = initOnConnectCallback
-        initialize(context)
+        enqueueOperation {
+            isInitializing = true
+            this.initOnConnectCallback = initOnConnectCallback
+            initialize(context)
+        }
     }
 
     /**
@@ -959,15 +953,6 @@ class BluetoothModel {
     }
 
     fun sharePhoneInfo(signalLevel: Int, networkType: String, batteryPercentage: Int) {
-        if (gatt == null) {
-            println("Error: Device is unavailable.")
-            return
-        }
-        if (commandCharacteristic == null) {
-            println("Error: Command characteristic is unavailable")
-            return
-        }
-
         // Check for Bluetooth Connect permission on Android 12+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             if (ActivityCompat.checkSelfPermission(
@@ -999,6 +984,7 @@ class BluetoothModel {
 
         if (bluetoothManager.getConnectedDevices(BluetoothProfile.GATT)
                 .find { it.address == connectDevice?.address } == null
+            || gatt == null || commandCharacteristic == null
         ) {
             startScan()
         } else {
@@ -1100,7 +1086,8 @@ class BluetoothModel {
                 if (indicateOnly) {
                     reset2()
                 } else {
-                    commandCharacteristic!!.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+                    commandCharacteristic!!.writeType =
+                        BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
                     commandCharacteristic!!.value = CommandType.IndicateReset.toByteArray()
                     gatt!!.writeCharacteristic(commandCharacteristic!!)
                 }
