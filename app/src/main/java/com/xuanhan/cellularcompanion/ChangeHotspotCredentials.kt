@@ -157,6 +157,12 @@ fun ChangeHotspotCredentials(navigator: DestinationsNavigator) {
                         context = context,
                         onCompleteCallback = {
                             isLoading = false
+                            coroutineScope.launch {
+                                snackbarHostState.showSnackbar(
+                                    message = "Hotspot credentials updated successfully.",
+                                    duration = SnackbarDuration.Short
+                                )
+                            }
                         },
                         onDefferedCallback = {
                             isLoading = false
@@ -169,7 +175,7 @@ fun ChangeHotspotCredentials(navigator: DestinationsNavigator) {
                         },
                     )
                 }, enabled = ssid.isNotEmpty() && (ssid != prevSSID || password != prevPassword)) {
-                    Text("Save")
+                    Text("Update")
                 }
             }
         }

@@ -1,10 +1,6 @@
 package com.xuanhan.cellularcompanion.services
 
 import android.Manifest
-import android.app.Notification
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
@@ -21,9 +17,10 @@ import android.telephony.TelephonyDisplayInfo
 import android.telephony.TelephonyManager
 import androidx.annotation.RequiresApi
 import androidx.core.app.ActivityCompat
-import com.xuanhan.cellularcompanion.MainActivity
-import com.xuanhan.cellularcompanion.R
+import androidx.core.app.NotificationManagerCompat
 import com.xuanhan.cellularcompanion.bluetoothModel
+import com.xuanhan.cellularcompanion.models.BluetoothModel.Companion.ConnectStatus
+import com.xuanhan.cellularcompanion.createBluetoothNotification
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -157,33 +154,7 @@ class BluetoothService : Service() {
             telephonyManager =
                 applicationContext.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
 
-            val name = "Bluetooth Service"
-            val descriptionText =
-                "Allows Cellular Companion to communicate with your Mac in the background."
-            val importance = NotificationManager.IMPORTANCE_LOW
-            val mChannel = NotificationChannel("bluetooth_service", name, importance)
-            mChannel.description = descriptionText
-            val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-            notificationManager.createNotificationChannel(mChannel)
-
-            val pendingIntent: PendingIntent =
-                Intent(this, MainActivity::class.java).let { notificationIntent ->
-                    PendingIntent.getActivity(
-                        this, 0, notificationIntent,
-                        PendingIntent.FLAG_IMMUTABLE
-                    )
-                }
-
-            val notification: Notification = Notification.Builder(this, "bluetooth_service")
-                .setContentTitle("Cellular Companion")
-                .setContentText("The Bluetooth service is running. Tap to view details.")
-                .setContentIntent(pendingIntent)
-                .setSmallIcon(R.mipmap.ic_launcher_round)
-                .build()
-
-            startForeground(1, notification)
-
-            CoroutineScope(Dispatchers.IO).launch {
+            CoroutineScope(Dispatchers.IO + CoroutineName("GetBatteryInfo")).launch {
                 println("Initialising Bluetooth model now...")
                 bluetoothModel.initializeFromDataStore(
                     {
@@ -200,7 +171,7 @@ class BluetoothService : Service() {
                 )
             }
 
-            CoroutineScope(Dispatchers.IO + CoroutineName("SeePhoneInfo")).launch {
+            CoroutineScope(Dispatchers.IO + CoroutineName("GetNetworkInfo")).launch {
                 bluetoothModel.isSeePhoneInfoEnabled.collect {
                     isSeePhoneInfoEnabled = it
 
@@ -215,6 +186,30 @@ class BluetoothService : Service() {
                     }
                 }
             }
+
+            if (ActivityCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) == PackageManager.PERMISSION_GRANTED
+            ) {
+                CoroutineScope(Dispatchers.IO + CoroutineName("UpdateStatusNotification")).launch {
+                    bluetoothModel.connectStatus.collect {
+                        val contentText = when (it) {
+                            ConnectStatus.Disconnected -> "Your Mac is not connected to this device."
+                            ConnectStatus.Idle -> "Your Mac is not connected to this device's hotspot."
+                            ConnectStatus.Connecting -> "Your Mac is connecting to this device's hotspot."
+                            ConnectStatus.Connected -> "Your Mac is connected to this device's hotspot."
+                        }
+                        val notification =
+                            createBluetoothNotification(contentText, this@BluetoothService)
+
+                        NotificationManagerCompat.from(this@BluetoothService)
+                            .notify(1, notification)
+                    }
+                }
+            }
+
+            startForeground(1, createBluetoothNotification(context = this))
 
             started = true
         }

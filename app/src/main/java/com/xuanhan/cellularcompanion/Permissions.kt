@@ -111,6 +111,16 @@ fun Permissions(navigator: DestinationsNavigator) {
                 rememberPermissionState(permission = Manifest.permission.CAMERA)
             )
         )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            add(
+                PermissionViewModel(
+                    "Notifications",
+                    "Allows notifications to show when your phone's hotspot is enabled or disabled.",
+                    rememberPermissionState(permission = Manifest.permission.POST_NOTIFICATIONS),
+                    isOptionalPermission = true
+                )
+            )
+        }
     }
     val scrollState = rememberScrollState()
     val enableBt = rememberLauncherForActivityResult(
@@ -217,7 +227,7 @@ fun Permissions(navigator: DestinationsNavigator) {
             Spacer(modifier = Modifier.weight(1f))
             if (permissions.all { permissionDescription ->
                     val isSpecialPermissionGranted: Boolean by permissionDescription.isSpecialPermissionGranted.collectAsState()
-                    permissionDescription.status.status == PermissionStatus.Granted || (permissionDescription.isSpecialPermission && isSpecialPermissionGranted)
+                    permissionDescription.status.status == PermissionStatus.Granted || permissionDescription.isOptionalPermission || (permissionDescription.isSpecialPermission && isSpecialPermissionGranted)
                 }) {
                 Button(onClick = {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {

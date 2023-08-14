@@ -89,6 +89,8 @@ class BluetoothModel {
     private var sharePhoneInfo2: (() -> Unit)? = null
     private var isConnectingToHotspot = false
     private var connectHotspot2: (() -> Unit)? = null
+    private var isDisconnectingFromHotspot = false
+    private var disconnectHotspot2: (() -> Unit)? = null
     private var isIndicatingReset = false
     private var indicateReset: (() -> Unit)? = null
 
@@ -126,7 +128,8 @@ class BluetoothModel {
             const val ShareHotspotDetails = "1"
             const val SharePhoneInfo = "2"
             const val ConnectToHotspot = "3"
-            const val IndicateReset = "4"
+            const val DisconnectFromHotspot = "4"
+            const val IndicateReset = "5"
         }
     }
 
@@ -382,6 +385,9 @@ class BluetoothModel {
                     // Request device to connect to hotspot
                     connectHotspot2?.invoke()
                     return
+                } else if (isDisconnectingFromHotspot) {
+                    // Request device to disconnect from hotspot
+                    disconnectHotspot2?.invoke()
                 } else if (isIndicatingReset) {
                     // Indicate reset to device
                     indicateReset?.invoke()
@@ -511,7 +517,7 @@ class BluetoothModel {
 
                     NotificationType.DisableHotspot -> {
                         println("Disabling hotspot...")
-                        disableHotspot()
+                        disableHotspot(indicateOnly = true)
                     }
 
                     NotificationType.IndicateConnectedHotspot -> {
@@ -641,6 +647,7 @@ class BluetoothModel {
         isSharingHotspotDetails = false
         isSharingPhoneInfo = false
         isConnectingToHotspot = false
+        isDisconnectingFromHotspot = false
         isIndicatingReset = false
         onHotspotDetailsSharedCallback = null
 
@@ -1003,15 +1010,48 @@ class BluetoothModel {
         }
     }
 
-    fun disableHotspot(noUpdateStatus: Boolean = false) {
-        if (!noUpdateStatus) {
-            // Indicate that hotspot is disconnected
-            _connectStatus.value = ConnectStatus.Idle
-        }
+    fun disableHotspot(indicateOnly: Boolean = false) {
+        // Indicate that hotspot is disconnected
+        _connectStatus.value = ConnectStatus.Idle
 
         // Disconnect from hotspot
         if (wifiHotspotManager.isHotspotStartedByUs && wifiHotspotManager.isTetherActive) {
             wifiHotspotManager.stopTethering()
+        }
+
+        // Indicate to Mac to disconnect from hotspot if needed
+        if (!indicateOnly) {
+            // Check for Bluetooth Connect permission on Android 12+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                if (ActivityCompat.checkSelfPermission(
+                        context,
+                        Manifest.permission.BLUETOOTH_CONNECT
+                    ) != PackageManager.PERMISSION_GRANTED
+                ) {
+                    println("Error: The Bluetooth Connect permission has not been granted.")
+                    return
+                }
+            }
+
+            enqueueOperation {
+                isDisconnectingFromHotspot = true
+
+                disconnectHotspot2 = {
+                    commandCharacteristic!!.writeType =
+                        BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+                    commandCharacteristic!!.value = CommandType.DisconnectFromHotspot.toByteArray()
+                    gatt!!.writeCharacteristic(commandCharacteristic!!)
+                }
+
+                if (bluetoothManager.getConnectedDevices(BluetoothProfile.GATT)
+                        .find { it.address == connectDevice?.address } == null
+                    || gatt == null || commandCharacteristic == null
+                ) {
+                    startScan()
+                } else {
+                    disconnectHotspot2!!.invoke()
+                }
+            }
         }
     }
 
@@ -1147,6 +1187,8 @@ class BluetoothModel {
         sharePhoneInfo2 = null
         isConnectingToHotspot = false
         connectHotspot2 = null
+        isDisconnectingFromHotspot = false
+        disconnectHotspot2 = null
         isIndicatingReset = false
         indicateReset = null
         hotspotDetailsRetryCallback = null

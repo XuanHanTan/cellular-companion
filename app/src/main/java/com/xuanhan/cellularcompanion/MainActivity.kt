@@ -2,6 +2,11 @@ package com.xuanhan.cellularcompanion
 
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.app.Service
 import android.bluetooth.BluetoothAdapter
 import android.content.ComponentName
 import android.content.Context
@@ -55,13 +60,40 @@ import kotlin.properties.Delegates
 
 @SuppressLint("StaticFieldLeak")
 // Note: Design flaw --> should have used state hoisting, but this isn't the biggest problem since there is only one activity.
-val bluetoothModel = BluetoothModel()
-lateinit var bluetoothService: BluetoothService
-var requiresBtPermissionCheck = false
-val isSetupCompleteKey = booleanPreferencesKey("isSetupComplete")
-var isSetupComplete by Delegates.notNull<Boolean>()
-val ssidKey = stringPreferencesKey("ssid")
-val passwordKey = stringPreferencesKey("password")
+internal val bluetoothModel = BluetoothModel()
+internal lateinit var bluetoothService: BluetoothService
+internal var requiresBtPermissionCheck = false
+internal val isSetupCompleteKey = booleanPreferencesKey("isSetupComplete")
+internal var isSetupComplete by Delegates.notNull<Boolean>()
+internal val ssidKey = stringPreferencesKey("ssid")
+internal val passwordKey = stringPreferencesKey("password")
+
+internal fun createBluetoothNotification(contentText: String = "Your phone is disconnected from your Mac.", context: Context): Notification {
+    val name = "Bluetooth Service"
+    val descriptionText =
+        "Allows Cellular Companion to communicate with your Mac in the background."
+    val importance = NotificationManager.IMPORTANCE_LOW
+    val mChannel = NotificationChannel("bluetooth_service", name, importance)
+    mChannel.description = descriptionText
+    val notificationManager =
+        context.getSystemService(Service.NOTIFICATION_SERVICE) as NotificationManager
+    notificationManager.createNotificationChannel(mChannel)
+
+    val pendingIntent: PendingIntent =
+        Intent(context, MainActivity::class.java).let { notificationIntent ->
+            PendingIntent.getActivity(
+                context, 0, notificationIntent,
+                PendingIntent.FLAG_IMMUTABLE
+            )
+        }
+
+    return Notification.Builder(context, "bluetooth_service")
+        .setContentTitle("Cellular Companion")
+        .setContentText(contentText)
+        .setContentIntent(pendingIntent)
+        .setSmallIcon(R.mipmap.ic_launcher_round)
+        .build()
+}
 
 // TODO: handle missing permissions
 class MainActivity : ComponentActivity() {

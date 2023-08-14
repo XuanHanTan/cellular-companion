@@ -16,6 +16,7 @@ class PermissionViewModel @OptIn(ExperimentalPermissionsApi::class) constructor(
     val title: String,
     val description: String?,
     val status: PermissionState,
+    val isOptionalPermission: Boolean = false,
     val isSpecialPermission: Boolean = false,
     val specialPermissionLauncher: ManagedActivityResultLauncher<Intent, ActivityResult>? = null,
     val context: Context? = null
