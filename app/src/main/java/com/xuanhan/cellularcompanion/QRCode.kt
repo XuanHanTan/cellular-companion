@@ -102,7 +102,7 @@ fun PreviewViewComposable(navigator: DestinationsNavigator) {
                         it.setAnalyzer(cameraExecutor, QRAnalyzer { text ->
                             val data = JSONObject(text)
                             if (!data.has("serviceUUID") || !data.has("sharedKey")) {
-                                print("No usable data found in QR Code.")
+                                println("No usable data found in QR Code.")
                                 return@QRAnalyzer
                             }
 
