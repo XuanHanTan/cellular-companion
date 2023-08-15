@@ -1,11 +1,6 @@
 package com.xuanhan.cellularcompanion
 
 import android.Manifest
-import android.app.Activity.RESULT_OK
-import android.bluetooth.BluetoothAdapter
-import android.bluetooth.BluetoothManager
-import android.content.Context
-import android.content.Intent
 import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -123,14 +118,6 @@ fun Permissions(navigator: DestinationsNavigator) {
         }
     }
     val scrollState = rememberScrollState()
-    val enableBt = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult(),
-        onResult = {
-            if (it.resultCode == RESULT_OK) {
-                requiresBtPermissionCheck = true
-                navigator.navigate(QRCodeDestination)
-            }
-        })
 
     Scaffold(
         topBar = {
@@ -234,16 +221,7 @@ fun Permissions(navigator: DestinationsNavigator) {
                         btConnectPermission!!.launchPermissionRequest()
                     }
 
-                    val bluetoothManager =
-                        context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
-                    val bluetoothAdapter = bluetoothManager.adapter
-                    if (!bluetoothAdapter.isEnabled) {
-                        val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
-                        enableBt.launch(enableBtIntent)
-                    } else {
-                        navigator.navigate(QRCodeDestination())
-                        requiresBtPermissionCheck = true
-                    }
+                    navigator.navigate(QRCodeDestination())
                 }) {
                     Text("Next")
                 }

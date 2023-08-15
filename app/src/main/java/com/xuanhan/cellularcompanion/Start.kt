@@ -12,7 +12,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import com.ramcosta.composedestinations.annotation.Destination
 import com.ramcosta.composedestinations.annotation.RootNavGraph
 import com.ramcosta.composedestinations.navigation.DestinationsNavigator
@@ -31,7 +30,6 @@ fun Start(navigator: DestinationsNavigator) {
 
     LaunchedEffect(key1 = null) {
         if (isSetupComplete) {
-            requiresBtPermissionCheck = true
             coroutineScope.launch(context = Dispatchers.Main.immediate) {
                 navigator.navigate(HomePageDestination) {
                     popUpTo(StartDestination.route) { inclusive = true }

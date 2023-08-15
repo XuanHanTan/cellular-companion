@@ -1,18 +1,11 @@
 package com.xuanhan.cellularcompanion.viewmodels
 
-import android.bluetooth.BluetoothManager
-import android.content.Context
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
 import com.xuanhan.cellularcompanion.bluetoothModel
-import com.xuanhan.cellularcompanion.models.BluetoothModel.Companion.ConnectStatus
-import com.xuanhan.cellularcompanion.requiresBtPermissionCheck
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
 
-class MainViewModel : ViewModel() {
+class MainViewModel {
     private val _isShowingScanFailedDialog = MutableStateFlow(false)
     val isShowingScanFailedDialog: StateFlow<Boolean> = _isShowingScanFailedDialog.asStateFlow()
     private lateinit var retryScanFailedDialogCallback: () -> Unit
@@ -40,12 +33,6 @@ class MainViewModel : ViewModel() {
     val isShowingResetFailedDialog: StateFlow<Boolean> =
         _isShowingResetFailedDialog.asStateFlow()
     private lateinit var retryResetFailedDialogCallback: () -> Unit
-    private val _isBluetoothEnabled = MutableStateFlow(true)
-    val isBluetoothEnabled: StateFlow<Boolean> =
-        _isBluetoothEnabled.asStateFlow()
-
-    var connectStatus = ConnectStatus.Disconnected
-        private set
 
     init {
         bluetoothModel.registerForErrorHandling(
@@ -57,12 +44,6 @@ class MainViewModel : ViewModel() {
             ::showHotspotFailedDialog,
             ::showResetFailedDialog
         )
-
-        viewModelScope.launch {
-            bluetoothModel.connectStatus.collect {
-                connectStatus = it
-            }
-        }
     }
 
     private fun showScanFailedDialog(retryCallback: () -> Unit) {
@@ -133,17 +114,5 @@ class MainViewModel : ViewModel() {
     fun confirmResetFailedDialog() {
         _isShowingResetFailedDialog.value = false
         retryResetFailedDialogCallback()
-    }
-
-    fun setBluetoothEnabled(context: Context): Boolean {
-        if (!requiresBtPermissionCheck) {
-            _isBluetoothEnabled.value = true
-        } else {
-            val bluetoothManager =
-                context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
-            val bluetoothAdapter = bluetoothManager.adapter
-            _isBluetoothEnabled.value = bluetoothAdapter.isEnabled
-        }
-        return _isBluetoothEnabled.value
     }
 }
