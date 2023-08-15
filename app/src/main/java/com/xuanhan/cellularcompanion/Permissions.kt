@@ -36,6 +36,8 @@ import com.google.accompanist.permissions.rememberPermissionState
 import com.google.accompanist.permissions.shouldShowRationale
 import com.ramcosta.composedestinations.annotation.Destination
 import com.ramcosta.composedestinations.navigation.DestinationsNavigator
+import com.xuanhan.cellularcompanion.destinations.HomePageDestination
+import com.xuanhan.cellularcompanion.destinations.PermissionsDestination
 import com.xuanhan.cellularcompanion.destinations.QRCodeDestination
 import com.xuanhan.cellularcompanion.viewmodels.PermissionViewModel
 import kotlinx.coroutines.flow.update
@@ -103,7 +105,8 @@ fun Permissions(navigator: DestinationsNavigator) {
             PermissionViewModel(
                 "Camera access",
                 "Required to scan the QR code shown on your Mac.",
-                rememberPermissionState(permission = Manifest.permission.CAMERA)
+                rememberPermissionState(permission = Manifest.permission.CAMERA),
+                isOptionalPermission = isSetupComplete
             )
         )
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -124,15 +127,17 @@ fun Permissions(navigator: DestinationsNavigator) {
             LargeTopAppBar(
                 title = { Text(text = "Permissions") },
                 navigationIcon = {
-                    IconButton(
-                        onClick = {
-                            navigator.popBackStack()
+                    if (!isSetupComplete) {
+                        IconButton(
+                            onClick = {
+                                navigator.popBackStack()
+                            }
+                        ) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.outline_arrow_back_24),
+                                contentDescription = "Back button"
+                            )
                         }
-                    ) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.outline_arrow_back_24),
-                            contentDescription = "Back button"
-                        )
                     }
                 },
             )
@@ -221,7 +226,13 @@ fun Permissions(navigator: DestinationsNavigator) {
                         btConnectPermission!!.launchPermissionRequest()
                     }
 
-                    navigator.navigate(QRCodeDestination())
+                    if (isSetupComplete) {
+                        navigator.navigate(HomePageDestination) {
+                            popUpTo(PermissionsDestination.route) { inclusive = true }
+                        }
+                    } else {
+                        navigator.navigate(QRCodeDestination())
+                    }
                 }) {
                     Text("Next")
                 }

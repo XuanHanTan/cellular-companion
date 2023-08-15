@@ -25,6 +25,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -53,6 +54,10 @@ fun HomePage(navigator: DestinationsNavigator) {
     val isPressed by interactionSource.collectIsPressedAsState()
     val connectStatus by bluetoothModel.connectStatus.collectAsState()
     val isShowingConfirmUnlinkDialog by viewModel.isShowingConfirmUnlinkDialog.collectAsState()
+
+    LaunchedEffect(key1 = null) {
+        viewModel.startBluetoothService(context)
+    }
 
     @Composable
     fun ConfirmUnlinkDialog() {

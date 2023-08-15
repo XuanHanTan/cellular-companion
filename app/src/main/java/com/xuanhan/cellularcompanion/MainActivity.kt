@@ -89,7 +89,6 @@ internal fun createBluetoothNotification(contentText: String = "Your phone is di
         .build()
 }
 
-// TODO: handle missing permissions
 class MainActivity : ComponentActivity() {
     private val viewModel = MainViewModel()
     private lateinit var hotspotManager: WifiHotspotManager
@@ -115,12 +114,6 @@ class MainActivity : ComponentActivity() {
             isSetupComplete = this@MainActivity.dataStore.data.map { settings ->
                 settings[isSetupCompleteKey] ?: false
             }.first()
-            CoroutineScope(Dispatchers.Main).launch {
-                if (isSetupComplete) {
-                    startService()
-                    connectService()
-                }
-            }
         }
     }
 

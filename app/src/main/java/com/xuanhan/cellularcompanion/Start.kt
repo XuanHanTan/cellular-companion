@@ -12,12 +12,15 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import com.ramcosta.composedestinations.annotation.Destination
 import com.ramcosta.composedestinations.annotation.RootNavGraph
 import com.ramcosta.composedestinations.navigation.DestinationsNavigator
 import com.xuanhan.cellularcompanion.destinations.HomePageDestination
 import com.xuanhan.cellularcompanion.destinations.IntroDestination
+import com.xuanhan.cellularcompanion.destinations.PermissionsDestination
 import com.xuanhan.cellularcompanion.destinations.StartDestination
+import com.xuanhan.cellularcompanion.viewmodels.StartViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
@@ -26,13 +29,21 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun Start(navigator: DestinationsNavigator) {
+    val viewModel = StartViewModel()
     val coroutineScope = rememberCoroutineScope()
+    val context = LocalContext.current
 
     LaunchedEffect(key1 = null) {
         if (isSetupComplete) {
             coroutineScope.launch(context = Dispatchers.Main.immediate) {
-                navigator.navigate(HomePageDestination) {
-                    popUpTo(StartDestination.route) { inclusive = true }
+                if (viewModel.checkPermissions(context)) {
+                    navigator.navigate(HomePageDestination) {
+                        popUpTo(StartDestination.route) { inclusive = true }
+                    }
+                } else {
+                    navigator.navigate(PermissionsDestination) {
+                        popUpTo(StartDestination.route) { inclusive = true }
+                    }
                 }
             }
         } else {

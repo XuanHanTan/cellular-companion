@@ -10,6 +10,7 @@ import com.xuanhan.cellularcompanion.MainActivity
 import com.xuanhan.cellularcompanion.bluetoothModel
 import com.xuanhan.cellularcompanion.destinations.HomePageDestination
 import com.xuanhan.cellularcompanion.destinations.StartDestination
+import com.xuanhan.cellularcompanion.isSetupComplete
 import com.xuanhan.cellularcompanion.models.dataStore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -23,6 +24,14 @@ class HomePageViewModel(context: Context, navigator: DestinationsNavigator): Vie
     init {
         bluetoothModel.registerForReset {
             completeReset(context, navigator)
+        }
+    }
+
+    fun startBluetoothService(context: Context) {
+        if (isSetupComplete) {
+            val mainActivity = context.findActivity() as MainActivity
+            mainActivity.startService()
+            mainActivity.connectService()
         }
     }
 
