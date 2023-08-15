@@ -136,6 +136,16 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    internal fun stopService() {
+        Intent(this, BluetoothService::class.java).also { intent ->
+            stopService(intent)
+        }
+    }
+
+    internal fun disconnectService() {
+        unbindService(connection)
+    }
+
     @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
     @OptIn(
         ExperimentalMaterialNavigationApi::class, ExperimentalAnimationApi::class,

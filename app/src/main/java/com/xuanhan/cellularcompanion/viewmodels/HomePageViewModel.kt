@@ -6,8 +6,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ramcosta.composedestinations.navigation.DestinationsNavigator
 import com.ramcosta.composedestinations.navigation.popUpTo
+import com.xuanhan.cellularcompanion.MainActivity
 import com.xuanhan.cellularcompanion.bluetoothModel
-import com.xuanhan.cellularcompanion.bluetoothService
 import com.xuanhan.cellularcompanion.destinations.HomePageDestination
 import com.xuanhan.cellularcompanion.destinations.StartDestination
 import com.xuanhan.cellularcompanion.models.dataStore
@@ -53,7 +53,9 @@ class HomePageViewModel(context: Context, navigator: DestinationsNavigator): Vie
                 it.clear()
             }
 
-            bluetoothService.stopSelf()
+            val mainActivity = context.findActivity() as MainActivity
+            mainActivity.disconnectService()
+            mainActivity.stopService()
 
             navigator.navigate(StartDestination) {
                 popUpTo(HomePageDestination) { inclusive = true }
