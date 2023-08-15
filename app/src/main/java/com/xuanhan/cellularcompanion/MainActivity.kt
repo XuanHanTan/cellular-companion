@@ -17,8 +17,8 @@ import androidx.activity.compose.setContent
 import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -153,7 +153,7 @@ class MainActivity : ComponentActivity() {
             val navHostEngine = rememberAnimatedNavHostEngine(
                 rootDefaultAnimations = RootNavGraphDefaultAnimations(
                     enterTransition = {
-                        slideInVertically(initialOffsetY = { it }) + fadeIn()
+                        slideInHorizontally(initialOffsetX = { it }) + fadeIn()
                     },
                     exitTransition = {
                         fadeOut()
@@ -162,7 +162,7 @@ class MainActivity : ComponentActivity() {
                         fadeIn()
                     },
                     popExitTransition = {
-                        slideOutVertically(targetOffsetY = { it }) + fadeOut()
+                        slideOutHorizontally (targetOffsetX = { it }) + fadeOut()
                     }
                 ),
             )
