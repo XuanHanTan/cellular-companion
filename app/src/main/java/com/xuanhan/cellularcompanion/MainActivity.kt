@@ -20,14 +20,17 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -36,6 +39,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.google.accompanist.navigation.material.ExperimentalMaterialNavigationApi
+import com.google.accompanist.systemuicontroller.rememberSystemUiController
 import com.ramcosta.composedestinations.DestinationsNavHost
 import com.ramcosta.composedestinations.animations.defaults.RootNavGraphDefaultAnimations
 import com.ramcosta.composedestinations.animations.rememberAnimatedNavHostEngine
@@ -166,7 +170,21 @@ class MainActivity : ComponentActivity() {
                     }
                 ),
             )
+
             AppTheme {
+                val systemUiController = rememberSystemUiController()
+                val useDarkIcons = !isSystemInDarkTheme()
+                val pageBackgroundColor = MaterialTheme.colorScheme.surface
+
+                DisposableEffect(systemUiController, useDarkIcons) {
+                    systemUiController.setSystemBarsColor(
+                        color = pageBackgroundColor,
+                        darkIcons = useDarkIcons
+                    )
+
+                    onDispose {}
+                }
+
                 Scaffold {
                     val showScanFailedDialogState: Boolean by viewModel.isShowingScanFailedDialog.collectAsState()
                     val showUnexpectedErrorDialogState: Boolean by viewModel.isShowingUnexpectedErrorDialog.collectAsState()

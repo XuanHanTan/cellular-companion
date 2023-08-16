@@ -95,7 +95,7 @@ fun HomePage(navigator: DestinationsNavigator) {
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
                 .padding(it)
-                .padding(0.dp, 32.dp, 0.dp, 48.dp)
+                .padding(0.dp, 16.dp, 0.dp, 32.dp)
                 .fillMaxWidth()
         ) {
             Text(

@@ -44,7 +44,7 @@ class BluetoothService : Service() {
             }
 
             override fun onDisplayInfoChanged(p0: TelephonyDisplayInfo) {
-                handleNetworkTypeChanged(p0.networkType)
+                handleNetworkTypeChanged(p0.networkType, p0.overrideNetworkType)
             }
         }
     else
@@ -63,13 +63,13 @@ class BluetoothService : Service() {
                     }
 
                     val networkType = telephonyManager.networkType
-                    handleNetworkTypeChanged(networkType)
+                    handleNetworkTypeChanged(networkType, 0)
                 }
             }
 
             @RequiresApi(Build.VERSION_CODES.R)
             override fun onDisplayInfoChanged(p0: TelephonyDisplayInfo) {
-                handleNetworkTypeChanged(p0.networkType)
+                handleNetworkTypeChanged(p0.networkType, p0.overrideNetworkType)
             }
         }
     private var started = false
@@ -86,32 +86,42 @@ class BluetoothService : Service() {
         prevModifiedSignalStrengthLevel = modifiedSignalStrengthLevel
     }
 
-    private fun handleNetworkTypeChanged(networkType: Int) {
-        val networkTypeString = when (networkType) {
-            TelephonyManager.NETWORK_TYPE_GPRS,
-            TelephonyManager.NETWORK_TYPE_1xRTT -> "GPRS"
+    private fun handleNetworkTypeChanged(networkType: Int, overrideNetworkType: Int) {
+        val networkTypeString = if (overrideNetworkType == 0) {
+            when (networkType) {
+                TelephonyManager.NETWORK_TYPE_GPRS,
+                TelephonyManager.NETWORK_TYPE_1xRTT -> "GPRS"
 
-            TelephonyManager.NETWORK_TYPE_EDGE,
-            TelephonyManager.NETWORK_TYPE_CDMA,
-            TelephonyManager.NETWORK_TYPE_IDEN,
-            TelephonyManager.NETWORK_TYPE_GSM -> "E"
+                TelephonyManager.NETWORK_TYPE_EDGE,
+                TelephonyManager.NETWORK_TYPE_CDMA,
+                TelephonyManager.NETWORK_TYPE_IDEN,
+                TelephonyManager.NETWORK_TYPE_GSM -> "E"
 
-            TelephonyManager.NETWORK_TYPE_UMTS,
-            TelephonyManager.NETWORK_TYPE_EVDO_0,
-            TelephonyManager.NETWORK_TYPE_EVDO_A,
-            TelephonyManager.NETWORK_TYPE_HSDPA,
-            TelephonyManager.NETWORK_TYPE_HSUPA,
-            TelephonyManager.NETWORK_TYPE_HSPA,
-            TelephonyManager.NETWORK_TYPE_EVDO_B,
-            TelephonyManager.NETWORK_TYPE_EHRPD,
-            TelephonyManager.NETWORK_TYPE_HSPAP,
-            TelephonyManager.NETWORK_TYPE_TD_SCDMA -> "3G"
+                TelephonyManager.NETWORK_TYPE_UMTS,
+                TelephonyManager.NETWORK_TYPE_EVDO_0,
+                TelephonyManager.NETWORK_TYPE_EVDO_A,
+                TelephonyManager.NETWORK_TYPE_HSDPA,
+                TelephonyManager.NETWORK_TYPE_HSUPA,
+                TelephonyManager.NETWORK_TYPE_HSPA,
+                TelephonyManager.NETWORK_TYPE_EVDO_B,
+                TelephonyManager.NETWORK_TYPE_EHRPD,
+                TelephonyManager.NETWORK_TYPE_HSPAP,
+                TelephonyManager.NETWORK_TYPE_TD_SCDMA -> "3G"
 
-            TelephonyManager.NETWORK_TYPE_LTE,
-            TelephonyManager.NETWORK_TYPE_IWLAN, 19 -> "4G"
+                TelephonyManager.NETWORK_TYPE_LTE,
+                TelephonyManager.NETWORK_TYPE_IWLAN, 19 -> "4G"
 
-            TelephonyManager.NETWORK_TYPE_NR -> "5G"
-            else -> ""
+                TelephonyManager.NETWORK_TYPE_NR -> "5G"
+                else -> ""
+            }
+        } else {
+            when (overrideNetworkType) {
+                TelephonyDisplayInfo.OVERRIDE_NETWORK_TYPE_LTE_CA -> "4G"
+                TelephonyDisplayInfo.OVERRIDE_NETWORK_TYPE_LTE_ADVANCED_PRO -> "5Ge"
+                TelephonyDisplayInfo.OVERRIDE_NETWORK_TYPE_NR_NSA -> "5G"
+                TelephonyDisplayInfo.OVERRIDE_NETWORK_TYPE_NR_ADVANCED -> "5G+"
+                else -> ""
+            }
         }
 
         if (networkTypeString != prevNetworkType) {

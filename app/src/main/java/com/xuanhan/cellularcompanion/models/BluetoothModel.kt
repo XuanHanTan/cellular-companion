@@ -1121,24 +1121,14 @@ class BluetoothModel {
         // Indicate to the Mac that this device is being unlinked
         isIndicatingReset = true
 
-        enqueueOperation {
-            indicateReset = {
-                if (indicateOnly) {
-                    reset2()
-                } else {
-                    commandCharacteristic!!.writeType =
-                        BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
-                    commandCharacteristic!!.value = CommandType.IndicateReset.toByteArray()
-                    gatt!!.writeCharacteristic(commandCharacteristic!!)
-                }
-            }
-
-            if (bluetoothManager.getConnectedDevices(BluetoothProfile.GATT)
-                    .find { it.address == connectDevice?.address } == null
-            ) {
-                startScan()
-            } else {
-                indicateReset!!.invoke()
+        if (indicateOnly || gatt == null || commandCharacteristic == null) {
+            reset2()
+        } else {
+            enqueueOperation {
+                commandCharacteristic!!.writeType =
+                    BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+                commandCharacteristic!!.value = CommandType.IndicateReset.toByteArray()
+                gatt!!.writeCharacteristic(commandCharacteristic!!)
             }
         }
     }
@@ -1146,7 +1136,7 @@ class BluetoothModel {
     @SuppressLint("MissingPermission")
     private fun reset2() {
         // Disable notifications
-        if (notificationCharacteristic != null) {
+        if (gatt != null && notificationCharacteristic != null) {
             val descriptor = notificationCharacteristic!!.getDescriptor(cccdUuid)
             gatt!!.setCharacteristicNotification(notificationCharacteristic!!, false)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
