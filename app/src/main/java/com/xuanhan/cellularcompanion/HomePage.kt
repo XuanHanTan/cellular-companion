@@ -38,6 +38,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.ramcosta.composedestinations.annotation.Destination
 import com.ramcosta.composedestinations.navigation.DestinationsNavigator
+import com.xuanhan.cellularcompanion.destinations.AboutDestination
 import com.xuanhan.cellularcompanion.destinations.ChangeHotspotCredentialsDestination
 import com.xuanhan.cellularcompanion.utilities.NoRippleTheme
 import com.xuanhan.cellularcompanion.viewmodels.HomePageViewModel
@@ -95,7 +96,7 @@ fun HomePage(navigator: DestinationsNavigator) {
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
                 .padding(it)
-                .padding(0.dp, 16.dp, 0.dp, 32.dp)
+                .padding(0.dp, 24.dp, 0.dp, 32.dp)
                 .fillMaxWidth()
         ) {
             Text(
@@ -194,7 +195,7 @@ fun HomePage(navigator: DestinationsNavigator) {
                 },
                 headlineText = { Text("About") },
                 modifier = Modifier.clickable {
-
+                    navigator.navigate(AboutDestination)
                 }
             )
             ListItem(
