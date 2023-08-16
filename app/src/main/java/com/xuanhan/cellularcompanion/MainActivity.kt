@@ -89,7 +89,7 @@ internal fun createBluetoothNotification(contentText: String = "Your phone is di
         .setContentTitle("Cellular Companion")
         .setContentText(contentText)
         .setContentIntent(pendingIntent)
-        .setSmallIcon(R.mipmap.ic_launcher_round)
+        .setSmallIcon(R.drawable.ic_notification)
         .build()
 }
 
