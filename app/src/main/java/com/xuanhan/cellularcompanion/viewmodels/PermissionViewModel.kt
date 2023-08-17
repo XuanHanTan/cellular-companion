@@ -1,9 +1,11 @@
 package com.xuanhan.cellularcompanion.viewmodels
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.PowerManager
 import android.provider.Settings
 import androidx.activity.compose.ManagedActivityResultLauncher
 import androidx.activity.result.ActivityResult
@@ -28,23 +30,52 @@ class PermissionViewModel @OptIn(ExperimentalPermissionsApi::class) constructor(
             when (status.permission) {
                 Manifest.permission.WRITE_SETTINGS -> {
                     context?.let {
-                        isSpecialPermissionGranted.value = Settings.System.canWrite(it)
+                        isSpecialPermissionGranted.value = getWriteSettingsGranted(it)
+                    }
+                }
+
+                Manifest.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS -> {
+                    context?.let {
+                        isSpecialPermissionGranted.value = getIgnoreBatteryOptimizationsGranted(it)
                     }
                 }
             }
         }
     }
 
+    companion object {
+        fun getWriteSettingsGranted(context: Context): Boolean {
+            return Settings.System.canWrite(context)
+        }
+
+        fun getIgnoreBatteryOptimizationsGranted(context: Context): Boolean {
+            return (context.getSystemService(Context.POWER_SERVICE) as PowerManager).isIgnoringBatteryOptimizations(
+                context.packageName
+            )
+        }
+    }
+
+    @SuppressLint("BatteryLife")
     fun grantPermission(context: Context) {
         if (isSpecialPermission) {
+            println(status.permission)
             when (status.permission) {
                 Manifest.permission.WRITE_SETTINGS -> {
-                    if (!Settings.System.canWrite(context)) {
+                    if (!getWriteSettingsGranted(context)) {
                         val writeSettingsIntent = Intent().apply {
                             action = Settings.ACTION_MANAGE_WRITE_SETTINGS
                             data = Uri.parse("package:" + context.packageName)
                         }
                         specialPermissionLauncher?.launch(writeSettingsIntent)
+                    }
+                }
+                Manifest.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS -> {
+                    if (!getIgnoreBatteryOptimizationsGranted(context)) {
+                        val ignoreBatteryOptimizationIntent = Intent().apply {
+                            action = Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS
+                            data = Uri.parse("package:" + context.packageName)
+                        }
+                        specialPermissionLauncher?.launch(ignoreBatteryOptimizationIntent)
                     }
                 }
             }

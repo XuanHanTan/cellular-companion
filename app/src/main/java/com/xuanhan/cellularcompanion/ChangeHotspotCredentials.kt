@@ -123,6 +123,7 @@ fun ChangeHotspotCredentials(navigator: DestinationsNavigator) {
                         isSSIDValid = !newValue.contains("\"")
                     },
                     modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
                 )
                 Spacer(modifier = Modifier.height(16.dp))
                 TextField(
@@ -148,7 +149,8 @@ fun ChangeHotspotCredentials(navigator: DestinationsNavigator) {
                     },
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
                 )
                 Spacer(modifier = Modifier.weight(1f))
                 Button(onClick = {

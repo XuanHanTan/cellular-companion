@@ -21,9 +21,21 @@ class StartViewModel {
         }
 
         for (permission in permissions) {
-            if (ActivityCompat.checkSelfPermission(context, permission) != PackageManager.PERMISSION_GRANTED) {
+            if (ActivityCompat.checkSelfPermission(
+                    context,
+                    permission
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
                 return false
             }
+        }
+
+        if (!PermissionViewModel.getWriteSettingsGranted(context)) {
+            return false
+        }
+
+        if (!PermissionViewModel.getIgnoreBatteryOptimizationsGranted(context)) {
+            return false
         }
 
         return true

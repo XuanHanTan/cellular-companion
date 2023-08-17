@@ -2,7 +2,6 @@ package com.xuanhan.cellularcompanion
 
 import android.Manifest
 import android.os.Build
-import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -56,8 +55,15 @@ fun Permissions(navigator: DestinationsNavigator) {
     val writeSystemSettingsLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult(),
         onResult = {
-            if (Settings.System.canWrite(context)) {
+            if (PermissionViewModel.getWriteSettingsGranted(context)) {
                 permissions.find { it.status.permission == Manifest.permission.WRITE_SETTINGS }
+                    ?.let {
+                        it.isSpecialPermissionGranted.update { true }
+                    }
+            }
+
+            if (PermissionViewModel.getIgnoreBatteryOptimizationsGranted(context)) {
+                permissions.find { it.status.permission == Manifest.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS }
                     ?.let {
                         it.isSpecialPermissionGranted.update { true }
                     }
@@ -107,6 +113,17 @@ fun Permissions(navigator: DestinationsNavigator) {
                 "Required to scan the QR code shown on your Mac.",
                 rememberPermissionState(permission = Manifest.permission.CAMERA),
                 isOptionalPermission = isSetupComplete
+            )
+        )
+        add(
+            PermissionViewModel(
+                "Ignore battery optimisations",
+                "Recommended to keep this app running in the background.",
+                rememberPermissionState(permission = Manifest.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS),
+                isOptionalPermission = true,
+                isSpecialPermission = true,
+                specialPermissionLauncher = writeSystemSettingsLauncher,
+                context = context,
             )
         )
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
