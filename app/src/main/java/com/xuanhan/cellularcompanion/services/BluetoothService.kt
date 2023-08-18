@@ -1,7 +1,9 @@
 package com.xuanhan.cellularcompanion.services
 
 import android.Manifest
+import android.app.NotificationManager
 import android.app.Service
+import android.bluetooth.BluetoothAdapter
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -17,10 +19,10 @@ import android.telephony.TelephonyDisplayInfo
 import android.telephony.TelephonyManager
 import androidx.annotation.RequiresApi
 import androidx.core.app.ActivityCompat
-import androidx.core.app.NotificationManagerCompat
 import com.xuanhan.cellularcompanion.bluetoothModel
-import com.xuanhan.cellularcompanion.models.BluetoothModel.Companion.ConnectStatus
+import com.xuanhan.cellularcompanion.broadcastreceivers.BluetoothStateBroadcastReceiver
 import com.xuanhan.cellularcompanion.createBluetoothNotification
+import com.xuanhan.cellularcompanion.isBluetoothEnabled
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -29,8 +31,10 @@ import java.util.Timer
 import java.util.TimerTask
 import kotlin.math.floor
 
+
 class BluetoothService : Service() {
     private val binder = BluetoothServiceBinder()
+    private val btStateBroadcastReceiver = BluetoothStateBroadcastReceiver()
     private val batteryLevelTimer = Timer()
     private var prevModifiedSignalStrengthLevel = -1
     private var prevNetworkType = ""
@@ -73,6 +77,7 @@ class BluetoothService : Service() {
             }
         }
     private var started = false
+    private var btStateBroadcastReceiverRegistered = false
     private var isSeePhoneInfoEnabled = false
 
     private fun handleSignalStrengthLevelChanged(signalStrengthLevel: Int) {
@@ -164,21 +169,24 @@ class BluetoothService : Service() {
             telephonyManager =
                 applicationContext.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
 
-            CoroutineScope(Dispatchers.IO + CoroutineName("GetBatteryInfo")).launch {
-                println("Initialising Bluetooth model now...")
-                bluetoothModel.initializeFromDataStore(
-                    {
-                        batteryLevelTimer.scheduleAtFixedRate(object : TimerTask() {
-                            override fun run() {
-                                getBatteryPercentage()
-                            }
-                        }, 0, 300000)
+            if (isBluetoothEnabled.value) {
+                CoroutineScope(Dispatchers.IO + CoroutineName("GetBatteryInfo")).launch {
+                    println("Initialising Bluetooth model now...")
+                    initBluetoothModel()
+                }
+            }
 
-                        if (isSeePhoneInfoEnabled) {
-                            startSharePhoneInfo()
-                        }
-                    }, applicationContext
-                )
+            CoroutineScope(Dispatchers.IO + CoroutineName("GetBluetoothState")).launch {
+                var prevBluetoothEnabled = isBluetoothEnabled.value
+                isBluetoothEnabled.collect {
+                    if (it && !prevBluetoothEnabled) {
+                        println("Reinitialising Bluetooth model now...")
+                        initBluetoothModel()
+                    } else if (!it && prevBluetoothEnabled) {
+                        bluetoothModel.disconnect()
+                    }
+                    prevBluetoothEnabled = it
+                }
             }
 
             CoroutineScope(Dispatchers.IO + CoroutineName("GetNetworkInfo")).launch {
@@ -204,27 +212,42 @@ class BluetoothService : Service() {
             ) {
                 CoroutineScope(Dispatchers.IO + CoroutineName("UpdateStatusNotification")).launch {
                     bluetoothModel.connectStatus.collect {
-                        val contentText = when (it) {
-                            ConnectStatus.Disconnected -> "Your Mac is not connected to this device."
-                            ConnectStatus.Idle -> "Your Mac is not connected to this device's hotspot."
-                            ConnectStatus.Connecting -> "Your Mac is connecting to this device's hotspot."
-                            ConnectStatus.Connected -> "Your Mac is connected to this device's hotspot."
-                        }
-                        val notification =
-                            createBluetoothNotification(contentText, this@BluetoothService)
+                        val notificationManager = applicationContext
+                            .getSystemService(NOTIFICATION_SERVICE) as NotificationManager
 
-                        NotificationManagerCompat.from(this@BluetoothService)
-                            .notify(1, notification)
+                        notificationManager.notify(1, createBluetoothNotification(connectStatus = it, context = applicationContext))
                     }
                 }
             }
 
-            startForeground(1, createBluetoothNotification(context = this))
+            startForeground(1, createBluetoothNotification(connectStatus = bluetoothModel.connectStatus.value, context = applicationContext))
 
+            if (btStateBroadcastReceiverRegistered) {
+                unregisterReceiver(btStateBroadcastReceiver)
+            }
+            registerReceiver(btStateBroadcastReceiver, IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED))
+
+            btStateBroadcastReceiverRegistered = true
             started = true
         }
 
         return START_STICKY
+    }
+
+    private suspend fun initBluetoothModel() {
+        bluetoothModel.initializeFromDataStore(
+            {
+                batteryLevelTimer.scheduleAtFixedRate(object : TimerTask() {
+                    override fun run() {
+                        getBatteryPercentage()
+                    }
+                }, 0, 300000)
+
+                if (isSeePhoneInfoEnabled) {
+                    startSharePhoneInfo()
+                }
+            }, applicationContext
+        )
     }
 
     private fun getBatteryPercentage(immediate: Boolean = false) {

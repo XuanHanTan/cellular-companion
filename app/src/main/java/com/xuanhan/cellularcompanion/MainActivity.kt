@@ -1,11 +1,14 @@
 package com.xuanhan.cellularcompanion
 
 import android.annotation.SuppressLint
+import android.app.Activity
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -14,6 +17,8 @@ import android.os.Bundle
 import android.os.IBinder
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.ActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -45,6 +50,7 @@ import com.ramcosta.composedestinations.animations.defaults.RootNavGraphDefaultA
 import com.ramcosta.composedestinations.animations.rememberAnimatedNavHostEngine
 import com.xuanhan.cellularcompanion.destinations.StartDestination
 import com.xuanhan.cellularcompanion.models.BluetoothModel
+import com.xuanhan.cellularcompanion.models.BluetoothModel.Companion.ConnectStatus
 import com.xuanhan.cellularcompanion.models.dataStore
 import com.xuanhan.cellularcompanion.services.BluetoothService
 import com.xuanhan.cellularcompanion.ui.theme.AppTheme
@@ -52,6 +58,7 @@ import com.xuanhan.cellularcompanion.utilities.WifiHotspotManager
 import com.xuanhan.cellularcompanion.viewmodels.MainViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -65,8 +72,15 @@ internal val isSetupCompleteKey = booleanPreferencesKey("isSetupComplete")
 internal var isSetupComplete by Delegates.notNull<Boolean>()
 internal val ssidKey = stringPreferencesKey("ssid")
 internal val passwordKey = stringPreferencesKey("password")
+internal var requiresBtPermissionCheck = MutableStateFlow(false)
+internal var isBluetoothEnabled = MutableStateFlow(false)
 
-internal fun createBluetoothNotification(contentText: String = "Your phone is disconnected from your Mac.", context: Context): Notification {
+internal fun createBluetoothNotification(
+    connectStatus: ConnectStatus = ConnectStatus.Disconnected,
+    context: Context
+): Notification {
+    println("Create notification: $connectStatus")
+
     val name = "Bluetooth Service"
     val descriptionText =
         "Allows Cellular Companion to communicate with your Mac in the background."
@@ -84,6 +98,17 @@ internal fun createBluetoothNotification(contentText: String = "Your phone is di
                 PendingIntent.FLAG_IMMUTABLE
             )
         }
+
+    var contentText = when (connectStatus) {
+        ConnectStatus.Disconnected -> "Your Mac is not connected to this device."
+        ConnectStatus.Idle -> "Your Mac is not connected to this device's hotspot."
+        ConnectStatus.Connecting -> "Your Mac is connecting to this device's hotspot."
+        ConnectStatus.Connected -> "Your Mac is connected to this device's hotspot."
+    }
+
+    if (!isBluetoothEnabled.value && connectStatus == ConnectStatus.Disconnected) {
+        contentText = "Bluetooth is disabled. Enable Bluetooth to connect to your Mac."
+    }
 
     return Notification.Builder(context, "bluetooth_service")
         .setContentTitle("Cellular Companion")
@@ -110,9 +135,18 @@ class MainActivity : ComponentActivity() {
             println("Service disconnected")
         }
     }
+    private val enableBt =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result: ActivityResult ->
+            if (result.resultCode == Activity.RESULT_OK) {
+                isBluetoothEnabled.value = true
+            }
+        }
 
     override fun onStart() {
         super.onStart()
+
+        isBluetoothEnabled.value =
+            (this.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager).adapter.isEnabled
 
         CoroutineScope(Dispatchers.IO).launch {
             isSetupComplete = this@MainActivity.dataStore.data.map { settings ->
@@ -166,7 +200,7 @@ class MainActivity : ComponentActivity() {
                         fadeIn()
                     },
                     popExitTransition = {
-                        slideOutHorizontally (targetOffsetX = { it }) + fadeOut()
+                        slideOutHorizontally(targetOffsetX = { it }) + fadeOut()
                     }
                 ),
             )
@@ -193,6 +227,8 @@ class MainActivity : ComponentActivity() {
                     val showBondFailedDialogState: Boolean by viewModel.isShowingBondFailedDialog.collectAsState()
                     val showHotspotFailedDialogState: Boolean by viewModel.isShowingHotspotFailedDialog.collectAsState()
                     val showResetFailedDialogState: Boolean by viewModel.isShowingResetFailedDialog.collectAsState()
+                    val isBluetoothEnabled: Boolean by isBluetoothEnabled.collectAsState()
+                    val requiresBtPermissionCheck: Boolean by requiresBtPermissionCheck.collectAsState()
 
                     if (showScanFailedDialogState)
                         ScanFailedDialog()
@@ -208,6 +244,8 @@ class MainActivity : ComponentActivity() {
                         HotspotFailedDialog()
                     if (showResetFailedDialogState)
                         ResetFailedDialog()
+                    if (!isBluetoothEnabled && requiresBtPermissionCheck)
+                        EnableBluetoothDialog()
 
                     Box(
                         Modifier
@@ -370,6 +408,38 @@ class MainActivity : ComponentActivity() {
                 Text(text = "Ensure that your Mac remains close to this device and try again.")
             }
         )
+    }
+
+    @Composable
+    fun EnableBluetoothDialog() {
+        AlertDialog(
+            onDismissRequest = {},
+            confirmButton = {
+                TextButton(onClick = {
+                    val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
+                    enableBt.launch(enableBtIntent)
+                }) {
+                    Text(text = "Enable")
+                }
+            },
+            dismissButton = {},
+            title = {
+                Text(text = "Turn on Bluetooth")
+            },
+            text = {
+                Text(text = "Bluetooth is required for Cellular Companion to connect to your Mac.")
+            }
+        )
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        println("onWindowFocusChanged")
+        if (hasFocus) {
+            if ((viewModel.connectStatus == ConnectStatus.Connected || viewModel.connectStatus == ConnectStatus.Connecting) && !hotspotManager.isTetherActive) {
+                bluetoothModel.disableHotspot()
+            }
+        }
     }
 
     override fun onStop() {

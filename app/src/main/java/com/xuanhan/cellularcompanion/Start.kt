@@ -37,6 +37,7 @@ fun Start(navigator: DestinationsNavigator) {
         if (isSetupComplete) {
             coroutineScope.launch(context = Dispatchers.Main.immediate) {
                 if (viewModel.checkPermissions(context)) {
+                    requiresBtPermissionCheck.value = true
                     navigator.navigate(HomePageDestination) {
                         popUpTo(StartDestination.route) { inclusive = true }
                     }

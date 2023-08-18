@@ -1,11 +1,15 @@
 package com.xuanhan.cellularcompanion.viewmodels
 
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.xuanhan.cellularcompanion.bluetoothModel
+import com.xuanhan.cellularcompanion.models.BluetoothModel.Companion.ConnectStatus
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 
-class MainViewModel {
+class MainViewModel: ViewModel() {
     private val _isShowingScanFailedDialog = MutableStateFlow(false)
     val isShowingScanFailedDialog: StateFlow<Boolean> = _isShowingScanFailedDialog.asStateFlow()
     private lateinit var retryScanFailedDialogCallback: () -> Unit
@@ -34,6 +38,9 @@ class MainViewModel {
         _isShowingResetFailedDialog.asStateFlow()
     private lateinit var retryResetFailedDialogCallback: () -> Unit
 
+    var connectStatus = ConnectStatus.Disconnected
+        private set
+
     init {
         bluetoothModel.registerForErrorHandling(
             ::showScanFailedDialog,
@@ -44,6 +51,12 @@ class MainViewModel {
             ::showHotspotFailedDialog,
             ::showResetFailedDialog
         )
+
+        viewModelScope.launch {
+            bluetoothModel.connectStatus.collect {
+                connectStatus = it
+            }
+        }
     }
 
     private fun showScanFailedDialog(retryCallback: () -> Unit) {

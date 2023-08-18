@@ -245,20 +245,7 @@ class BluetoothModel {
                     // Start discovering services of GATT device
                     gatt.discoverServices()
                 } else {
-                    if (isSetupComplete) {
-                        // Set connect status to disconnected
-                        _connectStatus.value = ConnectStatus.Disconnected
-
-                        // Disable hotspot if enabled
-                        disableHotspot()
-
-                        // Disable see phone info
-                        _isSeePhoneInfoEnabled.value = false
-
-                        // Start scan for devices if disconnected due to issues such as out of range, device powered off etc.
-                        startScan()
-                    }
-                    println("Disconnected from device advertising: ${gatt!!.device.address}")
+                    onDisconnected()
                 }
             } else {
                 if (isConnecting) {
@@ -292,6 +279,7 @@ class BluetoothModel {
                     gatt!!.disconnect()
                     println("GATT disconnection failed but will retry: $status")
                 } else {
+                    isDisconnecting = false
                     println("Error: GATT disconnection failed with status $status")
                 }
             }
@@ -617,6 +605,25 @@ class BluetoothModel {
                 }
             }
         }, 3000)
+    }
+
+    private fun onDisconnected(noRestartScan: Boolean = false) {
+        if (isSetupComplete) {
+            // Set connect status to disconnected
+            _connectStatus.value = ConnectStatus.Disconnected
+
+            // Disable hotspot if enabled
+            disableHotspot(indicateOnly = true, isDisconnecting = true)
+
+            // Disable see phone info
+            _isSeePhoneInfoEnabled.value = false
+
+            if (!noRestartScan) {
+                // Start scan for devices if disconnected due to issues such as out of range, device powered off etc.
+                startScan()
+            }
+        }
+        println("Disconnected from device advertising: ${gatt!!.device.address}")
     }
 
     @Synchronized
@@ -1010,9 +1017,11 @@ class BluetoothModel {
         }
     }
 
-    fun disableHotspot(indicateOnly: Boolean = false) {
-        // Indicate that hotspot is disconnected
-        _connectStatus.value = ConnectStatus.Idle
+    fun disableHotspot(indicateOnly: Boolean = false, isDisconnecting: Boolean = false) {
+        if (!isDisconnecting) {
+            // Indicate that hotspot is disconnected
+            _connectStatus.value = ConnectStatus.Idle
+        }
 
         // Disconnect from hotspot
         if (wifiHotspotManager.isHotspotStartedByUs && wifiHotspotManager.isTetherActive) {
@@ -1131,6 +1140,29 @@ class BluetoothModel {
                 gatt!!.writeCharacteristic(commandCharacteristic!!)
             }
         }
+    }
+
+    fun disconnect() {
+        // Check for Bluetooth Connect permission on Android 12+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (ActivityCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.BLUETOOTH_CONNECT
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                println("Error: The Bluetooth Connect permission has not been granted.")
+                return
+            }
+        }
+
+        if (gatt == null) {
+            println("Error: Device not connected.")
+            return
+        }
+
+        isDisconnecting = true
+        gatt!!.disconnect()
+        onDisconnected(noRestartScan = true)
     }
 
     @SuppressLint("MissingPermission")
