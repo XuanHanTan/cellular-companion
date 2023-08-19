@@ -1,5 +1,6 @@
 package com.xuanhan.cellularcompanion
 
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.clickable
@@ -32,6 +33,7 @@ import com.ramcosta.composedestinations.navigation.DestinationsNavigator
 fun About(navigator: DestinationsNavigator) {
     val context = LocalContext.current
     val websiteIntent = remember { Intent(Intent.ACTION_VIEW, Uri.parse("https://www.xuanhan.me")) }
+    val emailIntent = remember { Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:contact@xuanhan.me")) }
 
     Scaffold(topBar = {
         LargeTopAppBar(
@@ -61,11 +63,11 @@ fun About(navigator: DestinationsNavigator) {
             ) {
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
-                    "v1.0.0",
+                    "v1.0.1",
                     style = MaterialTheme.typography.displayLarge,
                 )
                 Spacer(modifier = Modifier.height(48.dp))
-                Text("This app was developed by Xuan Han Tan. I hope you find it useful!\n\n© Xuan Han Tan 2023. All rights reserved.")
+                Text("© Xuan Han Tan 2023. All rights reserved.\n\nThis app was developed by Xuan Han Tan. I hope you find it useful! If you want to learn more about me and my other projects, visit my website. If you have any questions, feel free to contact me by email.")
                 Spacer(modifier = Modifier.height(16.dp))
             }
             ListItem(
@@ -81,7 +83,31 @@ fun About(navigator: DestinationsNavigator) {
                     )
                 },
                 modifier = Modifier.clickable {
-                    context.startActivity(websiteIntent)
+                    try {
+                        context.startActivity(websiteIntent)
+                    } catch (e: ActivityNotFoundException) {
+                        println("Failed to start website activity: $e")
+                    }
+                }
+            )
+            ListItem(
+                leadingContent = {
+                    Icon(
+                        painter = painterResource(id = R.drawable.outline_email_24),
+                        contentDescription = "Email icon",
+                    )
+                },
+                headlineText = {
+                    Text(
+                        "Email me",
+                    )
+                },
+                modifier = Modifier.clickable {
+                    try {
+                        context.startActivity(emailIntent)
+                    } catch (e: ActivityNotFoundException) {
+                        println("Failed to start email activity: $e")
+                    }
                 }
             )
         }
