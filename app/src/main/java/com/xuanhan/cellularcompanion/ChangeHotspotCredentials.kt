@@ -46,7 +46,7 @@ fun ChangeHotspotCredentials(navigator: DestinationsNavigator) {
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
-    val viewModel = ChangeHotspotCredentialsViewModel(context)
+    val viewModel = remember { ChangeHotspotCredentialsViewModel(context) }
     val ssid by viewModel.ssid.collectAsState()
     val password by viewModel.password.collectAsState()
     val prevSSID by viewModel.prevSSID.collectAsState()

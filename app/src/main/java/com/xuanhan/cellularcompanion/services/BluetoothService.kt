@@ -26,6 +26,7 @@ import com.xuanhan.cellularcompanion.isBluetoothEnabled
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import java.util.Timer
 import java.util.TimerTask
@@ -36,6 +37,10 @@ class BluetoothService : Service() {
     private val binder = BluetoothServiceBinder()
     private val btStateBroadcastReceiver = BluetoothStateBroadcastReceiver()
     private val batteryLevelTimer = Timer()
+    private val getBatteryInfoCoroutineScope = CoroutineScope(Dispatchers.IO + CoroutineName("GetBatteryInfo"))
+    private val getBluetoothStateCoroutineScope = CoroutineScope(Dispatchers.IO + CoroutineName("GetBluetoothState"))
+    private val getNetworkInfoCoroutineScope = CoroutineScope(Dispatchers.IO + CoroutineName("GetNetworkInfo"))
+    private val updateStatusNotificationCoroutineScope = CoroutineScope(Dispatchers.IO + CoroutineName("UpdateStatusNotification"))
     private var prevModifiedSignalStrengthLevel = -1
     private var prevNetworkType = ""
     private var prevBatteryPercentage = -1
@@ -170,13 +175,13 @@ class BluetoothService : Service() {
                 applicationContext.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
 
             if (isBluetoothEnabled.value) {
-                CoroutineScope(Dispatchers.IO + CoroutineName("GetBatteryInfo")).launch {
+                getBatteryInfoCoroutineScope.launch {
                     println("Initialising Bluetooth model now...")
                     initBluetoothModel()
                 }
             }
 
-            CoroutineScope(Dispatchers.IO + CoroutineName("GetBluetoothState")).launch {
+            getBluetoothStateCoroutineScope.launch {
                 var prevBluetoothEnabled = isBluetoothEnabled.value
                 isBluetoothEnabled.collect {
                     if (it && !prevBluetoothEnabled) {
@@ -189,7 +194,7 @@ class BluetoothService : Service() {
                 }
             }
 
-            CoroutineScope(Dispatchers.IO + CoroutineName("GetNetworkInfo")).launch {
+            getNetworkInfoCoroutineScope.launch {
                 bluetoothModel.isSeePhoneInfoEnabled.collect {
                     isSeePhoneInfoEnabled = it
 
@@ -210,7 +215,7 @@ class BluetoothService : Service() {
                     Manifest.permission.POST_NOTIFICATIONS
                 ) == PackageManager.PERMISSION_GRANTED
             ) {
-                CoroutineScope(Dispatchers.IO + CoroutineName("UpdateStatusNotification")).launch {
+                updateStatusNotificationCoroutineScope.launch {
                     bluetoothModel.connectStatus.collect {
                         val notificationManager = applicationContext
                             .getSystemService(NOTIFICATION_SERVICE) as NotificationManager
@@ -264,6 +269,7 @@ class BluetoothService : Service() {
     }
 
     private fun startSharePhoneInfo() {
+        println("Start share phone info")
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             telephonyManager.registerTelephonyCallback(
                 applicationContext.mainExecutor,
@@ -278,6 +284,7 @@ class BluetoothService : Service() {
     }
 
     private fun disposePhoneStateListeners() {
+        println("Stop share phone info")
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             telephonyManager.unregisterTelephonyCallback(telephonyCallback as TelephonyCallback)
         } else {
@@ -292,6 +299,11 @@ class BluetoothService : Service() {
         if (started) {
             batteryLevelTimer.cancel()
             disposePhoneStateListeners()
+            this.unregisterReceiver(btStateBroadcastReceiver)
+            getBatteryInfoCoroutineScope.cancel()
+            getBluetoothStateCoroutineScope.cancel()
+            getNetworkInfoCoroutineScope.cancel()
+            updateStatusNotificationCoroutineScope.cancel()
             prevModifiedSignalStrengthLevel = -1
             prevNetworkType = ""
             prevBatteryPercentage = -1

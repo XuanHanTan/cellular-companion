@@ -121,17 +121,17 @@ internal fun createBluetoothNotification(
 class MainActivity : ComponentActivity() {
     private val viewModel = MainViewModel()
     private lateinit var hotspotManager: WifiHotspotManager
-    private var serviceConnected = false
+    private var isServiceConnected = false
     private val connection = object : ServiceConnection {
         override fun onServiceConnected(className: ComponentName, service: IBinder) {
             val binder = service as BluetoothService.BluetoothServiceBinder
             bluetoothService = binder.getService()
-            serviceConnected = true
+            isServiceConnected = true
             println("Service connected")
         }
 
         override fun onServiceDisconnected(arg0: ComponentName) {
-            serviceConnected = false
+            isServiceConnected = false
             println("Service disconnected")
         }
     }
@@ -175,6 +175,7 @@ class MainActivity : ComponentActivity() {
 
     internal fun disconnectService() {
         unbindService(connection)
+        isServiceConnected = false
     }
 
     @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
@@ -444,7 +445,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onStop() {
         super.onStop()
-        if (serviceConnected) {
+        if (isServiceConnected) {
             unbindService(connection)
         }
     }

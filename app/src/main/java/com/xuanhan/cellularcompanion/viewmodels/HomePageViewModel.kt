@@ -20,14 +20,17 @@ import kotlinx.coroutines.launch
 class HomePageViewModel(context: Context, navigator: DestinationsNavigator): ViewModel() {
     private val _isShowingConfirmUnlinkDialog = MutableStateFlow(false)
     val isShowingConfirmUnlinkDialog: StateFlow<Boolean> = _isShowingConfirmUnlinkDialog.asStateFlow()
+    private val _isLoading = MutableStateFlow(false)
+    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
     init {
         bluetoothModel.registerForReset {
             completeReset(context, navigator)
         }
+        startBluetoothService(context)
     }
 
-    fun startBluetoothService(context: Context) {
+    private fun startBluetoothService(context: Context) {
         if (isSetupComplete) {
             val mainActivity = context.findActivity() as MainActivity
             mainActivity.startService()
@@ -53,6 +56,7 @@ class HomePageViewModel(context: Context, navigator: DestinationsNavigator): Vie
 
     fun confirmConfirmUnlinkDialog() {
         _isShowingConfirmUnlinkDialog.value = false
+        _isLoading.value = true
         bluetoothModel.reset()
     }
 

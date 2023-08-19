@@ -6,7 +6,6 @@ import android.content.ContextWrapper
 import androidx.datastore.preferences.core.edit
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.xuanhan.cellularcompanion.MainActivity
 import com.xuanhan.cellularcompanion.bluetoothModel
 import com.xuanhan.cellularcompanion.models.dataStore
 import com.xuanhan.cellularcompanion.passwordKey
@@ -53,10 +52,7 @@ class SettingUpViewModel: ViewModel() {
         )
     }
 
-    suspend fun completeSetup(context: Context) {
+    suspend fun completeSetup() {
         bluetoothModel.markSetupComplete()
-        val mainActivity = context.findActivity() as MainActivity
-        mainActivity.startService()
-        mainActivity.connectService()
     }
 }

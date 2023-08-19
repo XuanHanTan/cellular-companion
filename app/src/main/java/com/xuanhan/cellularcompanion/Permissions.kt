@@ -29,6 +29,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -62,6 +63,7 @@ fun Permissions(navigator: DestinationsNavigator) {
                 } else {
                     navigator.navigate(QRCodeDestination())
                 }
+                isBluetoothEnabled.value = true
                 requiresBtPermissionCheck.value = true
             }
         })
@@ -85,7 +87,7 @@ fun Permissions(navigator: DestinationsNavigator) {
         }
     }
 
-    val permissions = ArrayList<PermissionViewModel>()
+    val permissions = remember { ArrayList<PermissionViewModel>() }
     val writeSystemSettingsLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult(),
         onResult = {

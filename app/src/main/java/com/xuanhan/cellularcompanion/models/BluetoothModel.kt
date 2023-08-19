@@ -623,7 +623,7 @@ class BluetoothModel {
                 startScan()
             }
         }
-        println("Disconnected from device advertising: ${gatt!!.device.address}")
+        println("Disconnected from device advertising: ${gatt?.device?.address}")
     }
 
     @Synchronized

@@ -38,7 +38,7 @@ fun SettingUp2(navigator: DestinationsNavigator, ssid: String, password: String)
         viewModel.shareHotspotDetails(ssid, password, context = currentContext) {
             println("Hotspot credentials shared successfully!")
             coroutineScope.launch(context = Dispatchers.IO) {
-                viewModel.completeSetup(context = currentContext)
+                viewModel.completeSetup()
                 coroutineScope.launch(context = Dispatchers.Main.immediate) {
                     navigator.navigate(StartDestination) {
                         popUpTo(SettingUp2Destination.route) { inclusive = true }
