@@ -1218,13 +1218,20 @@ class BluetoothModel {
         _connectStatus.value = ConnectStatus.Disconnected
         _isSeePhoneInfoEnabled.value = false
 
-        // Disconnect from device
-        gatt?.disconnect()
+        Timer().schedule(object : TimerTask() {
+            override fun run() {
+                // Disconnect from device
+                gatt?.disconnect()
 
-        // Reset BLE connection
-        resetBLE()
+                // Reset BLE connection
+                resetBLE()
 
-        // Let view model know that reset is complete
-        onResetCompleteCallback!!.invoke()
+                // Close GATT
+                gatt?.close()
+
+                // Let view model know that reset is complete
+                onResetCompleteCallback!!.invoke()
+            }
+        }, 3000)
     }
 }
