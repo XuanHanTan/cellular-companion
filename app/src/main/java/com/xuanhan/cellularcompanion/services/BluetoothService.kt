@@ -4,6 +4,7 @@ import android.Manifest
 import android.app.NotificationManager
 import android.app.Service
 import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothManager
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -171,6 +172,7 @@ class BluetoothService : Service() {
         if (!started) {
             println("Service started")
 
+            isBluetoothEnabled.value = (applicationContext.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager).adapter.isEnabled
             telephonyManager =
                 applicationContext.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
 

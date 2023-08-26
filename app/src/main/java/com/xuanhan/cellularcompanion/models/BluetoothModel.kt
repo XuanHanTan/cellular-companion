@@ -1232,6 +1232,6 @@ class BluetoothModel {
                 // Let view model know that reset is complete
                 onResetCompleteCallback!!.invoke()
             }
-        }, 3000)
+        }, 1500)
     }
 }
