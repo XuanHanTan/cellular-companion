@@ -100,10 +100,10 @@ internal fun createBluetoothNotification(
         }
 
     var contentText = when (connectStatus) {
-        ConnectStatus.Disconnected -> "Your Mac is not connected to this device."
-        ConnectStatus.Idle -> "Your Mac is not connected to this device's hotspot."
-        ConnectStatus.Connecting -> "Your Mac is connecting to this device's hotspot."
-        ConnectStatus.Connected -> "Your Mac is connected to this device's hotspot."
+        ConnectStatus.Disconnected -> "Your Mac is disconnected from this device."
+        ConnectStatus.Idle -> "Hotspot is off."
+        ConnectStatus.Connecting -> "Connecting to hotspot..."
+        ConnectStatus.Connected -> "Connected to hotspot."
     }
 
     if (!isBluetoothEnabled.value && connectStatus == ConnectStatus.Disconnected) {

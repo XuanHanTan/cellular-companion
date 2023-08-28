@@ -7,12 +7,12 @@ plugins {
 
 android {
     namespace = "com.xuanhan.cellularcompanion"
-    compileSdk = 33
+    compileSdk = 34
 
     defaultConfig {
         applicationId = "com.xuanhan.cellularcompanion"
         minSdk = 26
-        targetSdk = 33
+        targetSdk = 34
         versionCode = 5
         versionName = "1.0.3"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -66,7 +66,7 @@ dependencies {
     ksp("io.github.raamcosta.compose-destinations:ksp:1.9.42-beta")
     implementation("com.linkedin.dexmaker:dexmaker:2.28.3")
     implementation("androidx.datastore:datastore-preferences:1.0.0")
-    implementation("androidx.navigation:navigation-compose:2.6.0")
+    implementation("androidx.navigation:navigation-compose:2.7.1")
     implementation("androidx.core:core-ktx:1.10.1")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.6.1")
     implementation("androidx.activity:activity-compose:1.7.2")
