@@ -237,6 +237,8 @@ class BluetoothModel {
                     // Save GATT device for later reference
                     this@BluetoothModel.gatt = gatt
 
+                    isConnecting = false
+
                     println("Connected to device ${gatt!!.device.address}")
 
                     // Stop scan for devices
@@ -268,6 +270,8 @@ class BluetoothModel {
                             }
                         }
 
+                        isConnecting = false
+
                         // Start scan for devices again
                         startScan()
 
@@ -280,6 +284,9 @@ class BluetoothModel {
                     println("GATT disconnection failed but will retry: $status")
                 } else {
                     isDisconnecting = false
+
+                    onDisconnected()
+
                     println("Error: GATT disconnection failed with status $status")
                 }
             }
@@ -407,10 +414,10 @@ class BluetoothModel {
                     // Indicate that initialization is complete
                     initOnConnectCallback?.invoke()
                     indicateOperationComplete()
-
-                    // Indicate that device is connected
-                    _connectStatus.value = ConnectStatus.Idle
                 }
+
+                // Indicate that device is connected
+                _connectStatus.value = ConnectStatus.Idle
             } else {
                 println("Error: Failed to write to descriptor of characteristic ${descriptor!!.characteristic.uuid} with status $status")
                 if (!isDisconnecting) {
