@@ -33,7 +33,9 @@ import java.util.Timer
 import java.util.TimerTask
 import kotlin.math.floor
 
-
+/**
+ * This service is used to manage the Bluetooth connection to the Mac.
+ */
 class BluetoothService : Service() {
     private val binder = BluetoothServiceBinder()
     private val btStateBroadcastReceiver = BluetoothStateBroadcastReceiver()
@@ -86,6 +88,10 @@ class BluetoothService : Service() {
     private var btStateBroadcastReceiverRegistered = false
     private var isSeePhoneInfoEnabled = false
 
+    /**
+     * This function notifies the Mac of a change in the signal strength level if needed, modifying the signal strength level for the Cellular app (0 to 3).
+     * @param signalStrengthLevel The signal strength level reported by Android (0 to 4).
+     */
     private fun handleSignalStrengthLevelChanged(signalStrengthLevel: Int) {
         val modifiedSignalStrengthLevel =
             floor(((signalStrengthLevel.toDouble() + 1) / 5 * 4) + 0.5).toInt() - 1
@@ -97,6 +103,11 @@ class BluetoothService : Service() {
         prevModifiedSignalStrengthLevel = modifiedSignalStrengthLevel
     }
 
+    /**
+     * This function notifies the Mac of a change in the network type if needed, modifying the network type for the Cellular app.
+     * @param networkType The network type reported by Android.
+     * @param overrideNetworkType The override network type reported by Android.
+     */
     private fun handleNetworkTypeChanged(networkType: Int, overrideNetworkType: Int) {
         val networkTypeString = if (overrideNetworkType == 0) {
             when (networkType) {
@@ -143,6 +154,11 @@ class BluetoothService : Service() {
         prevNetworkType = networkTypeString
     }
 
+    /**
+     * This function notifies the Mac of a change in the battery percentage if needed.
+     * @param batteryPercentage The battery percentage reported by Android.
+     * @param immediate Whether to immediately notify the Mac of the battery percentage.
+     */
     private fun handleBatteryPercentageChanged(batteryPercentage: Int, immediate: Boolean) {
         if (isSeePhoneInfoEnabled) {
             if (batteryPercentage != prevBatteryPercentage || immediate) {
@@ -154,10 +170,6 @@ class BluetoothService : Service() {
         prevBatteryPercentage = batteryPercentage
     }
 
-    /**
-     * Class used for the client Binder. Because we know this service always
-     * runs in the same process as its clients, we don't need to deal with IPC.
-     */
     inner class BluetoothServiceBinder : Binder() {
         fun getService(): BluetoothService {
             return this@BluetoothService
@@ -172,10 +184,14 @@ class BluetoothService : Service() {
         if (!started) {
             println("Service started")
 
+            // Update Bluetooth enabled state
             isBluetoothEnabled.value = (applicationContext.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager).adapter.isEnabled
+
+            // Initialise telephony manager
             telephonyManager =
                 applicationContext.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
 
+            // Initialise Bluetooth model if Bluetooth is enabled
             if (isBluetoothEnabled.value) {
                 getBatteryInfoCoroutineScope.launch {
                     println("Initialising Bluetooth model now...")
@@ -185,31 +201,53 @@ class BluetoothService : Service() {
 
             getBluetoothStateCoroutineScope.launch {
                 var prevBluetoothEnabled = isBluetoothEnabled.value
+
+                // Listen for changes in Bluetooth enabled state
                 isBluetoothEnabled.collect {
                     val notificationManager = applicationContext
                         .getSystemService(NOTIFICATION_SERVICE) as NotificationManager
 
                     if (it && !prevBluetoothEnabled) {
+                        // Re-initialise Bluetooth model if Bluetooth has become enabled
                         println("Reinitialising Bluetooth model now...")
                         initBluetoothModel()
                     } else if (!it && prevBluetoothEnabled) {
+                        // Disconnect from Mac if Bluetooth has become disabled
                         bluetoothModel.disconnect()
                     }
 
-                    notificationManager.notify(1, createBluetoothNotification(connectStatus = bluetoothModel.connectStatus.value, context = applicationContext))
+                    if (ActivityCompat.checkSelfPermission(
+                            this@BluetoothService,
+                            Manifest.permission.POST_NOTIFICATIONS
+                        ) == PackageManager.PERMISSION_GRANTED
+                    ) {
+                        // Update status notification
+                        notificationManager.notify(
+                            1,
+                            createBluetoothNotification(
+                                connectStatus = bluetoothModel.connectStatus.value,
+                                context = applicationContext
+                            )
+                        )
+                    }
 
                     prevBluetoothEnabled = it
                 }
             }
 
             getNetworkInfoCoroutineScope.launch {
+                // Listen for changes in the "See phone info" setting
                 bluetoothModel.isSeePhoneInfoEnabled.collect {
                     isSeePhoneInfoEnabled = it
 
                     if (isSeePhoneInfoEnabled) {
+                        // Start sharing phone info
                         startSharePhoneInfo()
+
+                        // Share battery info immediately
                         getBatteryPercentage(immediate = true)
                     } else {
+                        // Stop sharing phone info and reset all phone info values
                         prevModifiedSignalStrengthLevel = -1
                         prevNetworkType = ""
                         prevBatteryPercentage = -1
@@ -224,17 +262,21 @@ class BluetoothService : Service() {
                 ) == PackageManager.PERMISSION_GRANTED
             ) {
                 updateStatusNotificationCoroutineScope.launch {
+                    // Listen for changes in the connect status
                     bluetoothModel.connectStatus.collect {
                         val notificationManager = applicationContext
                             .getSystemService(NOTIFICATION_SERVICE) as NotificationManager
 
+                        // Update status notification
                         notificationManager.notify(1, createBluetoothNotification(connectStatus = it, context = applicationContext))
                     }
                 }
             }
 
+            // Start service as a foreground service with the status notification
             startForeground(1, createBluetoothNotification(connectStatus = bluetoothModel.connectStatus.value, context = applicationContext))
 
+            // Register a new broadcast receiver to listen for changes in the Bluetooth enabled state
             if (btStateBroadcastReceiverRegistered) {
                 unregisterReceiver(btStateBroadcastReceiver)
             }
@@ -247,6 +289,9 @@ class BluetoothService : Service() {
         return START_STICKY
     }
 
+    /**
+     * This function initialises the Bluetooth model and starts retrieving battery percentage every 5 min.
+     */
     private suspend fun initBluetoothModel() {
         bluetoothModel.initializeFromDataStore(
             {
@@ -255,14 +300,14 @@ class BluetoothService : Service() {
                         getBatteryPercentage()
                     }
                 }, 0, 300000)
-
-                if (isSeePhoneInfoEnabled) {
-                    startSharePhoneInfo()
-                }
             }, applicationContext
         )
     }
 
+    /**
+     * This function retrieves the current battery percentage.
+     * @param immediate Whether to immediately notify the Mac of the battery percentage.
+     */
     private fun getBatteryPercentage(immediate: Boolean = false) {
         val batteryStatus: Intent? = IntentFilter(Intent.ACTION_BATTERY_CHANGED).let {
             applicationContext.registerReceiver(null, it)
@@ -276,6 +321,9 @@ class BluetoothService : Service() {
         handleBatteryPercentageChanged(batteryPct ?: 100, immediate)
     }
 
+    /**
+     * This function starts sharing phone info.
+     */
     private fun startSharePhoneInfo() {
         println("Start share phone info")
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -291,6 +339,9 @@ class BluetoothService : Service() {
         }
     }
 
+    /**
+     * This function disposes the listeners related to sharing phone info.
+     */
     private fun disposePhoneStateListeners() {
         println("Stop share phone info")
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {

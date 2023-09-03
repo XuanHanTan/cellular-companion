@@ -9,6 +9,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
+/**
+ * This class is the view model for MainActivity.
+ */
 class MainViewModel: ViewModel() {
     private val _isShowingScanFailedDialog = MutableStateFlow(false)
     val isShowingScanFailedDialog: StateFlow<Boolean> = _isShowingScanFailedDialog.asStateFlow()

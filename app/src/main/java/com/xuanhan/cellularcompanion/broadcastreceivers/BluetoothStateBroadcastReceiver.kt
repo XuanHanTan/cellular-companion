@@ -6,8 +6,10 @@ import android.content.Context
 import android.content.Intent
 import com.xuanhan.cellularcompanion.isBluetoothEnabled
 
+/**
+ * This broadcast receiver is used to detect changes in the Bluetooth enabled state.
+ * */
 class BluetoothStateBroadcastReceiver : BroadcastReceiver() {
-
     override fun onReceive(context: Context, intent: Intent) {
         if (BluetoothAdapter.ACTION_STATE_CHANGED == intent.action) {
             when (intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, -1)) {

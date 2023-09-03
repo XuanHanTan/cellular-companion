@@ -247,6 +247,7 @@ class BluetoothModel {
                     // Start discovering services of GATT device
                     gatt.discoverServices()
                 } else {
+                    // Indicate successful disconnection
                     onDisconnected()
                 }
             } else {
@@ -285,6 +286,7 @@ class BluetoothModel {
                 } else {
                     isDisconnecting = false
 
+                    // Indicate disconnection
                     onDisconnected()
 
                     println("Error: GATT disconnection failed with status $status")
@@ -450,6 +452,7 @@ class BluetoothModel {
                     // Indicate that initialization is complete
                     initOnConnectCallback?.invoke()
                 } else if (isSharingHotspotDetails) {
+                    // Indicate that hotspot details are shared
                     onHotspotDetailsSharedCallback?.invoke()
                 } else if (isConnectingToHotspot) {
                     // Indicate that hotspot is connected
@@ -543,11 +546,17 @@ class BluetoothModel {
         }
     }
 
+    /**
+     * This function handles a successful bond.
+     * */
     fun onBonded() {
         // Continue next part of setup (sending Hello World command)
         initialize2()
     }
 
+    /**
+     * This function handles a bond failure.
+     * */
     fun onBondingFailed() {
         println("Error: Failed to bond to device ${connectDevice!!.address}")
 
@@ -573,6 +582,9 @@ class BluetoothModel {
         }
     }
 
+    /**
+     * This function handles when the hotspot is enabled. There is a delay of 3 seconds before the Mac is notified that the hotspot is enabled.
+     * */
     private fun onTetheringStarted() {
         println("Hotspot started")
 
@@ -591,6 +603,7 @@ class BluetoothModel {
                     }
                 }
 
+                // Notify Mac to connect to hotspot
                 enqueueOperation {
                     isConnectingToHotspot = true
 
@@ -614,6 +627,10 @@ class BluetoothModel {
         }, 3000)
     }
 
+    /**
+     * This function handles when the Mac is disconnected from this device (Bluetooth).
+     * @param noRestartScan Whether to restart the scan for the Mac.
+     * */
     private fun onDisconnected(noRestartScan: Boolean = false) {
         if (isSetupComplete) {
             // Set connect status to disconnected
@@ -625,14 +642,19 @@ class BluetoothModel {
             // Disable see phone info
             _isSeePhoneInfoEnabled.value = false
 
+            // Start scan for devices if disconnected due to issues such as out of range, device powered off etc. if needed
             if (!noRestartScan) {
-                // Start scan for devices if disconnected due to issues such as out of range, device powered off etc.
                 startScan()
             }
         }
+
         println("Disconnected from device advertising: ${gatt?.device?.address}")
     }
 
+    /**
+     * This function adds a new Bluetooth operation to the queue (because BLE operations must be run one at a time).
+     * @param operation The operation to add to the queue.
+     * */
     @Synchronized
     private fun enqueueOperation(operation: () -> Unit) {
         operationQueue.add(operation)
@@ -641,6 +663,9 @@ class BluetoothModel {
         }
     }
 
+    /**
+     * This function starts the next Bluetooth operation. This function should only be called by [enqueueOperation] or [indicateOperationComplete].
+     * */
     @Synchronized
     private fun doNextOperation() {
         operationQueue.poll()?.let {
@@ -650,6 +675,9 @@ class BluetoothModel {
         }
     }
 
+    /**
+     * This function indicates the completion of a Bluetooth operation. This function must be called after the completion of each Bluetooth operation, whether it succeeded or failed.
+     * */
     @Synchronized
     private fun indicateOperationComplete() {
         isRunningOperation = false
@@ -750,6 +778,7 @@ class BluetoothModel {
 
     /**
      * This function starts the scan for BLE devices when initialising.
+     * @param context The context of the application that calls this function.
      * */
     private fun initialize(context: Context) {
         // Initialise context and BluetoothManager
@@ -850,6 +879,7 @@ class BluetoothModel {
 
     /**
      * This function gets a characteristic reference based on its UUID from the GATT device. The GATT device's services must be discovered before calling this function.
+     * @param characteristicUUID The UUID of the characteristic to get.
      * */
     private fun getCharacteristicForDevice(characteristicUUID: String): BluetoothGattCharacteristic? {
         if (gatt == null) {
@@ -867,6 +897,9 @@ class BluetoothModel {
         }
     }
 
+    /**
+     * This function enables notifications from the Mac through BLE.
+     * */
     private fun enableNotifications() {
         if (gatt == null) {
             println("Error: Device is unavailable.")
@@ -929,7 +962,7 @@ class BluetoothModel {
     }
 
     /**
-     * This function shares the hotspot details with the device running the Cellular app.
+     * This function shares the hotspot details with the Mac.
      * @param ssid The SSID of the hotspot to connect to.
      * @param password The password of the hotspot to connect to.
      * @param onHotspotDetailsSharedCallback The callback function to be called when the hotspot details have been shared.
@@ -966,6 +999,9 @@ class BluetoothModel {
         }
     }
 
+    /**
+     * This function marks setup as complete (stored in DataStore).
+     * */
     suspend fun markSetupComplete() {
         isSetupComplete = true
         context.dataStore.edit { settings ->
@@ -973,6 +1009,12 @@ class BluetoothModel {
         }
     }
 
+    /**
+     * This function shares the phone info with the Mac. Pass -1 to any of the parameters to indicate that the value is not present. This is a public function to enqueue this operation.
+     * @param signalLevel The signal level of the phone (-1 to 3)
+     * @param networkType The network type of the phone (-1, GPRS, E, 3G, 4G, 5G)
+     * @param batteryPercentage The battery percentage of the phone (-1 to 100)
+     */
     fun sharePhoneInfo(signalLevel: Int, networkType: String, batteryPercentage: Int) {
         // Check for Bluetooth Connect permission on Android 12+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -992,6 +1034,12 @@ class BluetoothModel {
         }
     }
 
+    /**
+     * This function shares the phone info with the Mac. Pass -1 to any of the parameters to indicate that the value is not present.
+     * @param signalLevel The signal level of the phone (-1 to 3)
+     * @param networkType The network type of the phone (-1, GPRS, E, 3G, 4G, 5G)
+     * @param batteryPercentage The battery percentage of the phone (-1 to 100)
+     */
     @SuppressLint("MissingPermission")
     private fun startSharePhoneInfo(signalLevel: Int, networkType: String, batteryPercentage: Int) {
         isSharingPhoneInfo = true
@@ -1013,6 +1061,9 @@ class BluetoothModel {
         }
     }
 
+    /**
+     * This function enables the hotspot on the phone.
+     * */
     fun enableHotspot() {
         // Indicate that hotspot is connecting
         _connectStatus.value = ConnectStatus.Connecting
@@ -1024,6 +1075,11 @@ class BluetoothModel {
         }
     }
 
+    /**
+     * This function disables the hotspot on the phone.
+     * @param indicateOnly Whether this device should only update itself that the hotspot has been disabled.
+     * @param isDisconnecting Whether the hotspot is being disabled due to this device disconnecting from the Mac.
+     * */
     fun disableHotspot(indicateOnly: Boolean = false, isDisconnecting: Boolean = false) {
         if (!isDisconnecting) {
             // Indicate that hotspot is disconnected
@@ -1071,6 +1127,9 @@ class BluetoothModel {
         }
     }
 
+    /**
+     * This function updates this device that the Mac is connected to its hotspot.
+     * */
     fun indicateConnectedHotspot() {
         _connectStatus.value = ConnectStatus.Connected
     }
@@ -1080,7 +1139,10 @@ class BluetoothModel {
      * @param onScanFailedCallback The callback function to be called when BLE scans fail.
      * @param onUnexpectedErrorCallback The callback function to be called when an unexpected error occurs.
      * @param onHotspotDetailsShareFailedCallback The callback function to be called when sharing hotspot details fails.
-     * @param onConnectFailedCallback The callback function to be called when connecting to a device fails.
+     * @param onConnectFailedCallback The callback function to be called when connecting to the Mac fails.
+     * @param onBondFailedCallback The callback function to be called when bonding fails.
+     * @param onHotspotFailedCallback The callback function to be called when enabling hotspot fails.
+     * @param onResetFailedCallback The callback function to be called when unlinking from the Mac fails.
      * */
     fun registerForErrorHandling(
         onScanFailedCallback: (() -> Unit) -> Unit,
@@ -1117,10 +1179,18 @@ class BluetoothModel {
         hotspotShareRetryCount = 0
     }
 
+    /**
+     * This function registers a callback from a view model for when unlinking from the Mac is complete.
+     * @param onResetCompleteCallback The callback function to be called when unlinking from the Mac is complete.
+     * */
     fun registerForReset(onResetCompleteCallback: () -> Unit) {
         this.onResetCompleteCallback = onResetCompleteCallback
     }
 
+    /**
+     * This function unlinks this device from the Mac.
+     * @param indicateOnly Whether this device should only update itself that it is being unlinked.
+     */
     fun reset(indicateOnly: Boolean = false) {
         // Check for Bluetooth Connect permission on Android 12+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -1138,8 +1208,10 @@ class BluetoothModel {
         isIndicatingReset = true
 
         if (indicateOnly || gatt == null || commandCharacteristic == null) {
+            // Skip notifying the Mac that reset has started if the Mac is not connected
             reset2()
         } else {
+            // Notify the Mac that reset has started
             enqueueOperation {
                 commandCharacteristic!!.writeType =
                     BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
@@ -1149,6 +1221,9 @@ class BluetoothModel {
         }
     }
 
+    /**
+     * This function disconnects from the Mac (Bluetooth).
+     * */
     fun disconnect() {
         // Check for Bluetooth Connect permission on Android 12+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -1172,6 +1247,9 @@ class BluetoothModel {
         onDisconnected(noRestartScan = true)
     }
 
+    /**
+     * This function completes the unlinking from the Mac.
+     * */
     @SuppressLint("MissingPermission")
     private fun reset2() {
         // Disable notifications
@@ -1225,6 +1303,7 @@ class BluetoothModel {
         _connectStatus.value = ConnectStatus.Disconnected
         _isSeePhoneInfoEnabled.value = false
 
+        // This part is run 1.5s later to allow the Mac to receive and process the reset command
         Timer().schedule(object : TimerTask() {
             override fun run() {
                 // Disconnect from device

@@ -166,7 +166,7 @@ fun ChangeHotspotCredentials(navigator: DestinationsNavigator) {
                                 )
                             }
                         },
-                        onDefferedCallback = {
+                        onDeferredCallback = {
                             isLoading = false
                             coroutineScope.launch {
                                 snackbarHostState.showSnackbar(

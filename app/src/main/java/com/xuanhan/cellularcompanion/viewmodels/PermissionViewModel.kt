@@ -13,6 +13,9 @@ import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.PermissionState
 import kotlinx.coroutines.flow.MutableStateFlow
 
+/**
+ * This class is the view model for the Permission screen.
+ */
 @OptIn(ExperimentalPermissionsApi::class)
 class PermissionViewModel @OptIn(ExperimentalPermissionsApi::class) constructor(
     val title: String,

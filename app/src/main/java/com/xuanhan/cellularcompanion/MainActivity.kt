@@ -11,6 +11,7 @@ import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
 import android.content.ComponentName
 import android.content.Context
+import android.content.ContextWrapper
 import android.content.Intent
 import android.content.ServiceConnection
 import android.os.Bundle
@@ -74,6 +75,15 @@ internal val ssidKey = stringPreferencesKey("ssid")
 internal val passwordKey = stringPreferencesKey("password")
 internal var requiresBtPermissionCheck = MutableStateFlow(false)
 internal var isBluetoothEnabled = MutableStateFlow(false)
+
+fun Context.findActivity(): Activity {
+    var context = this
+    while (context is ContextWrapper) {
+        if (context is Activity) return context
+        context = context.baseContext
+    }
+    throw IllegalStateException("Error: Context should be of an Activity.")
+}
 
 internal fun createBluetoothNotification(
     connectStatus: ConnectStatus = ConnectStatus.Disconnected,

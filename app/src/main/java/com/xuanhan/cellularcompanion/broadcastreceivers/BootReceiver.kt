@@ -14,6 +14,9 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
+/**
+ * This broadcast receiver is used to detect when the device has booted up.
+ * */
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
@@ -23,6 +26,8 @@ class BootReceiver : BroadcastReceiver() {
                 isSetupComplete = context.dataStore.data.map { settings ->
                     settings[isSetupCompleteKey] ?: false
                 }.first()
+
+                // Start Bluetooth service if setup is complete
                 if (isSetupComplete) {
                     CoroutineScope(Dispatchers.Main).launch {
                         Intent(context, BluetoothService::class.java).also { intent ->

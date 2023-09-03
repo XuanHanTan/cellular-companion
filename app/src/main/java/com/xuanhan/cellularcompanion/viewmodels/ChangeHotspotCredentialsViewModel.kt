@@ -14,6 +14,9 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import com.xuanhan.cellularcompanion.models.BluetoothModel.Companion.ConnectStatus
 
+/**
+ * This class is the view model for the Change Hotspot Credentials screen.
+ */
 class ChangeHotspotCredentialsViewModel(context: Context) : ViewModel() {
     val ssid = MutableStateFlow("")
     val password = MutableStateFlow("")
@@ -41,14 +44,22 @@ class ChangeHotspotCredentialsViewModel(context: Context) : ViewModel() {
         }
     }
 
-    fun save(context: Context, onCompleteCallback: () -> Unit, onDefferedCallback: () -> Unit) {
+    /**
+     * This function saves the new hotspot credentials to the phone's DataStore. Either the [onCompleteCallback] or [onDeferredCallback] will be called.
+     * @param context The context of the activity that calls this function.
+     * @param onCompleteCallback The callback function to be called when the hotspot details have been shared.
+     * @param onDeferredCallback The callback function to be called when the hotspot details have not been shared but is queued to be shared.
+     */
+    fun save(context: Context, onCompleteCallback: () -> Unit, onDeferredCallback: () -> Unit) {
         var skipOnCompleteCallback = false
 
+        // Do not wait for completion if Mac is currently disconnected
         if (bluetoothModel.connectStatus.value == ConnectStatus.Disconnected) {
-            onDefferedCallback()
+            onDeferredCallback()
             skipOnCompleteCallback = true
         }
 
+        // Share hotspot details
         bluetoothModel.shareHotspotDetails(
             ssid.value,
             password.value,

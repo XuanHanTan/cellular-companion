@@ -6,7 +6,13 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.app.ActivityCompat
 
+/**
+ * This class is the view model for the Start screen.
+ */
 class StartViewModel {
+    /**
+     * This function checks that the required permissions have been granted.
+     */
     fun checkPermissions(context: Context): Boolean {
         val permissions = ArrayList<String>().apply {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
