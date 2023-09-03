@@ -63,7 +63,7 @@ fun About(navigator: DestinationsNavigator) {
             ) {
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
-                    "v1.0.5",
+                    "v1.0.6",
                     style = MaterialTheme.typography.displayLarge,
                 )
                 Spacer(modifier = Modifier.height(48.dp))

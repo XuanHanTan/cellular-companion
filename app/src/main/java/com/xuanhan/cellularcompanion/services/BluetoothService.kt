@@ -186,12 +186,18 @@ class BluetoothService : Service() {
             getBluetoothStateCoroutineScope.launch {
                 var prevBluetoothEnabled = isBluetoothEnabled.value
                 isBluetoothEnabled.collect {
+                    val notificationManager = applicationContext
+                        .getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+
                     if (it && !prevBluetoothEnabled) {
                         println("Reinitialising Bluetooth model now...")
                         initBluetoothModel()
                     } else if (!it && prevBluetoothEnabled) {
                         bluetoothModel.disconnect()
                     }
+
+                    notificationManager.notify(1, createBluetoothNotification(connectStatus = bluetoothModel.connectStatus.value, context = applicationContext))
+
                     prevBluetoothEnabled = it
                 }
             }
