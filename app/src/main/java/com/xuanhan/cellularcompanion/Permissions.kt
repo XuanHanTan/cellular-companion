@@ -10,13 +10,12 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.Orientation
-import androidx.compose.foundation.gestures.scrollable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -180,7 +179,6 @@ fun Permissions(navigator: DestinationsNavigator) {
             )
         }
     }
-    val scrollState = rememberScrollState()
 
     Scaffold(
         topBar = {
@@ -207,8 +205,6 @@ fun Permissions(navigator: DestinationsNavigator) {
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
                 .padding(it)
-                .padding(0.dp, 0.dp, 0.dp, 32.dp)
-                .scrollable(scrollState, orientation = Orientation.Horizontal)
         ) {
             Text(
                 "To allow Cellular Companion to communicate with your Mac, you’ll have to grant some permissions. Tap on each permission to grant it to this app.",
@@ -216,67 +212,73 @@ fun Permissions(navigator: DestinationsNavigator) {
                 modifier = Modifier.padding(horizontal = 16.dp)
             )
             Spacer(modifier = Modifier.height(16.dp))
-            permissions.forEach { permissionDescription ->
-                ListItem(
-                    leadingContent = {
-                        val grantedIcon = @Composable {
-                            Icon(
-                                painter = painterResource(id = R.drawable.outline_done_24),
-                                contentDescription = "Permission granted",
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                        val deniedIcon = @Composable {
-                            Icon(
-                                painter = painterResource(id = R.drawable.outline_close_24),
-                                contentDescription = "Permission denied",
-                                tint = MaterialTheme.colorScheme.error
-                            )
-                        }
-                        val notGrantedIcon = @Composable {
-                            Icon(
-                                painter = painterResource(id = R.drawable.outline_done_24),
-                                contentDescription = "Permission not granted",
-                                tint = MaterialTheme.colorScheme.outline
-                            )
-                        }
-
-                        if (permissionDescription.isSpecialPermission) {
-                            val isSpecialPermissionGranted: Boolean by permissionDescription.isSpecialPermissionGranted.collectAsState()
-
-                            if (isSpecialPermissionGranted) {
-                                grantedIcon()
-                            } else {
-                                notGrantedIcon()
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                permissions.forEach { permissionDescription ->
+                    ListItem(
+                        leadingContent = {
+                            val grantedIcon = @Composable {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.outline_done_24),
+                                    contentDescription = "Permission granted",
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
                             }
-                        } else {
-                            when (permissionDescription.status.status) {
-                                PermissionStatus.Granted -> {
-                                    grantedIcon()
-                                }
+                            val deniedIcon = @Composable {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.outline_close_24),
+                                    contentDescription = "Permission denied",
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                            }
+                            val notGrantedIcon = @Composable {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.outline_done_24),
+                                    contentDescription = "Permission not granted",
+                                    tint = MaterialTheme.colorScheme.outline
+                                )
+                            }
 
-                                is PermissionStatus.Denied -> {
-                                    if (permissionDescription.status.status.shouldShowRationale) {
-                                        deniedIcon()
-                                    } else {
-                                        notGrantedIcon()
+                            if (permissionDescription.isSpecialPermission) {
+                                val isSpecialPermissionGranted: Boolean by permissionDescription.isSpecialPermissionGranted.collectAsState()
+
+                                if (isSpecialPermissionGranted) {
+                                    grantedIcon()
+                                } else {
+                                    notGrantedIcon()
+                                }
+                            } else {
+                                when (permissionDescription.status.status) {
+                                    PermissionStatus.Granted -> {
+                                        grantedIcon()
+                                    }
+
+                                    is PermissionStatus.Denied -> {
+                                        if (permissionDescription.status.status.shouldShowRationale) {
+                                            deniedIcon()
+                                        } else {
+                                            notGrantedIcon()
+                                        }
                                     }
                                 }
                             }
+                        },
+                        headlineText = { Text(permissionDescription.title) },
+                        supportingText = if (permissionDescription.description == null) null else {
+                            {
+                                Text(permissionDescription.description)
+                            }
+                        },
+                        modifier = Modifier.clickable {
+                            permissionDescription.grantPermission(context)
                         }
-                    },
-                    headlineText = { Text(permissionDescription.title) },
-                    supportingText = if (permissionDescription.description == null) null else {
-                        {
-                            Text(permissionDescription.description)
-                        }
-                    },
-                    modifier = Modifier.clickable {
-                        permissionDescription.grantPermission(context)
-                    }
-                )
+                    )
+                }
             }
-            Spacer(modifier = Modifier.weight(1f))
+            Spacer(modifier = Modifier.height(16.dp))
             Button(onClick = {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                     btConnectPermissionLauncher.launch(Manifest.permission.BLUETOOTH_CONNECT)
@@ -289,6 +291,7 @@ fun Permissions(navigator: DestinationsNavigator) {
             }) {
                 Text("Next")
             }
+            Spacer(modifier = Modifier.height(32.dp))
         }
     }
 }

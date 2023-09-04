@@ -73,6 +73,7 @@ class BluetoothModel {
     private var gatt: BluetoothGatt? = null
     private var commandCharacteristic: BluetoothGattCharacteristic? = null
     private var notificationCharacteristic: BluetoothGattCharacteristic? = null
+    private var bleScanTimer: Timer? = null
     private var isScanning = false
     private var isConnecting = false
     private var isDisconnecting = false
@@ -808,57 +809,70 @@ class BluetoothModel {
             }
         }
 
-        // Write Hello World command to command characteristic
-        commandCharacteristic!!.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
-        commandCharacteristic!!.value = CommandType.HelloWorld.toByteArray()
-        gatt!!.writeCharacteristic(commandCharacteristic!!)
+        if (bluetoothManager.getConnectedDevices(BluetoothProfile.GATT)
+                .find { it.address == connectDevice?.address } == null
+            || gatt == null || commandCharacteristic == null
+        ) {
+            startScan()
+        } else {
+            // Write Hello World command to command characteristic
+            commandCharacteristic!!.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+            commandCharacteristic!!.value = CommandType.HelloWorld.toByteArray()
+            gatt!!.writeCharacteristic(commandCharacteristic!!)
+        }
     }
 
     /**
      * This function starts the scan for BLE devices matching the set service UUID. The serviceUUID variable has to be set before calling this function.
      * */
     private fun startScan() {
-        // Reset BLE connection before starting scan
-        resetBLE()
+        // Schedule repeating 29min 30s timer
+        bleScanTimer = Timer()
+        bleScanTimer!!.schedule(object : TimerTask() {
+            override fun run() {
+                // Reset BLE connection before starting scan
+                resetBLE(stopScanTimer = false)
 
-        // Scan for BLE devices advertising this service UUID
-        val filter =
-            ScanFilter.Builder().setServiceUuid(ParcelUuid.fromString(serviceUUID)).build()
-        val scanSettings = ScanSettings.Builder().apply {
-            if (isFirstInitializing) {
-                setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
-            } else {
-                setScanMode(ScanSettings.SCAN_MODE_LOW_POWER)
+                // Scan for BLE devices advertising this service UUID
+                val filter =
+                    ScanFilter.Builder().setServiceUuid(ParcelUuid.fromString(serviceUUID)).build()
+                val scanSettings = ScanSettings.Builder().apply {
+                    if (isFirstInitializing) {
+                        setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
+                    } else {
+                        setScanMode(ScanSettings.SCAN_MODE_LOW_POWER)
+                    }
+                }
+                    .setCallbackType(ScanSettings.CALLBACK_TYPE_ALL_MATCHES)
+                    .setMatchMode(ScanSettings.MATCH_MODE_STICKY)
+                    .build()
+
+                // Start BLE scan
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    if (ActivityCompat.checkSelfPermission(
+                            context,
+                            Manifest.permission.BLUETOOTH_SCAN
+                        ) != PackageManager.PERMISSION_GRANTED
+                    ) {
+                        println("Error: The Bluetooth Scan permission has not been granted.")
+                        return
+                    }
+                }
+
+                bluetoothAdapter.bluetoothLeScanner.startScan(
+                    listOf(filter),
+                    scanSettings,
+                    bleScanCallback
+                )
+                isScanning = true
             }
-        }
-            .setCallbackType(ScanSettings.CALLBACK_TYPE_ALL_MATCHES)
-            .setMatchMode(ScanSettings.MATCH_MODE_STICKY)
-            .build()
-
-        // Start BLE scan
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            if (ActivityCompat.checkSelfPermission(
-                    context,
-                    Manifest.permission.BLUETOOTH_SCAN
-                ) != PackageManager.PERMISSION_GRANTED
-            ) {
-                println("Error: The Bluetooth Scan permission has not been granted.")
-                return
-            }
-        }
-
-        bluetoothAdapter.bluetoothLeScanner.startScan(
-            listOf(filter),
-            scanSettings,
-            bleScanCallback
-        )
-        isScanning = true
+        }, 0, 1770000)
     }
 
     /**
      * This function stops the scan for BLE devices if it is running.
      * */
-    private fun stopScan() {
+    private fun stopScan(stopScanTimer: Boolean = true) {
         if (isScanning) {
             // Check for Bluetooth Connect permission on Android 12+
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -874,6 +888,12 @@ class BluetoothModel {
 
             // Stop BLE scan
             bluetoothAdapter.bluetoothLeScanner.stopScan(bleScanCallback)
+
+            // Stop BLE scan timer if needed
+            if (stopScanTimer) {
+                bleScanTimer?.cancel()
+                bleScanTimer = null
+            }
         }
     }
 
@@ -1165,8 +1185,8 @@ class BluetoothModel {
     /**
      * This function resets the BLE connection to allow reconnecting to a BLE device.
      * */
-    private fun resetBLE() {
-        stopScan()
+    private fun resetBLE(stopScanTimer: Boolean = true) {
+        stopScan(stopScanTimer = stopScanTimer)
 
         connectDevice = null
         gatt = null
