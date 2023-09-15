@@ -632,10 +632,14 @@ class BluetoothModel {
      * This function handles when the Mac is disconnected from this device (Bluetooth).
      * @param noRestartScan Whether to restart the scan for the Mac.
      * */
+    @SuppressLint("MissingPermission")
     private fun onDisconnected(noRestartScan: Boolean = false) {
         if (isSetupComplete) {
             // Set connect status to disconnected
             _connectStatus.value = ConnectStatus.Disconnected
+
+            // Disable notifications for characteristic
+            gatt!!.setCharacteristicNotification(notificationCharacteristic!!, false)
 
             // Disable hotspot if enabled
             disableHotspot(indicateOnly = true, isDisconnecting = true)
