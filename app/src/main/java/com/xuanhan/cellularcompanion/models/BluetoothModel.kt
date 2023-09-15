@@ -166,7 +166,6 @@ class BluetoothModel {
 
                     // Stop scan
                     stopScan()
-                    isScanning = false
 
                     println("Found Bluetooth device: ${result.scanRecord?.serviceUuids} $name $address")
                     println("Now attempting to connect to Bluetooth device.")
@@ -241,9 +240,6 @@ class BluetoothModel {
                     isConnecting = false
 
                     println("Connected to device ${gatt!!.device.address}")
-
-                    // Stop scan for devices
-                    stopScan()
 
                     // Start discovering services of GATT device
                     gatt.discoverServices()
@@ -898,6 +894,9 @@ class BluetoothModel {
                 bleScanTimer?.cancel()
                 bleScanTimer = null
             }
+
+            // Set isScanning to false
+            isScanning = false
         }
     }
 
