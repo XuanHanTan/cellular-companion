@@ -489,7 +489,9 @@ class BluetoothModel {
                         reset()
                     }
                 } else {
-                    indicateOperationComplete()
+                    disconnect()
+                    resetBLE()
+                    startScan()
                 }
             }
         }
@@ -634,8 +636,10 @@ class BluetoothModel {
             // Set connect status to disconnected
             _connectStatus.value = ConnectStatus.Disconnected
 
-            // Disable notifications for characteristic
-            gatt!!.setCharacteristicNotification(notificationCharacteristic!!, false)
+            // Disable notifications for characteristic if needed
+            if (gatt != null) {
+                gatt!!.setCharacteristicNotification(notificationCharacteristic!!, false)
+            }
 
             // Disable hotspot if enabled
             disableHotspot(indicateOnly = true, isDisconnecting = true)
