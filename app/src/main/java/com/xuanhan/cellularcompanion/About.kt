@@ -63,11 +63,11 @@ fun About(navigator: DestinationsNavigator) {
             ) {
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
-                    "v1.0.10",
+                    "v1.1.0",
                     style = MaterialTheme.typography.displayLarge,
                 )
                 Spacer(modifier = Modifier.height(48.dp))
-                Text("© Xuan Han Tan 2023. All rights reserved.\n\nThis app was developed by Xuan Han Tan. I hope you find it useful! If you want to learn more about me and my other projects, visit my website. If you have any questions, feel free to contact me by email.")
+                Text("© Xuan Han Tan 2023 - 2024. All rights reserved.\n\nThis app was developed by Xuan Han Tan. I hope you find it useful! If you want to learn more about me and my other projects, visit my website. If you have any questions, feel free to contact me by email.")
                 Spacer(modifier = Modifier.height(16.dp))
             }
             ListItem(

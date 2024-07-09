@@ -7,14 +7,14 @@ plugins {
 
 android {
     namespace = "com.xuanhan.cellularcompanion"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.xuanhan.cellularcompanion"
         minSdk = 26
-        targetSdk = 34
-        versionCode = 13
-        versionName = "1.0.10"
+        targetSdk = 35
+        versionCode = 14
+        versionName = "1.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
